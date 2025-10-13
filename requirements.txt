@@ -1,0 +1,37 @@
+# Investment Operations Compliance System Dependencies
+
+# Core Flask Application
+flask
+flask-sqlalchemy
+flask-cors
+
+# Database
+SQLAlchemy
+
+# Data Processing
+pandas
+numpy
+
+# SQL Parsing and Validation
+sqlparse
+
+# Timezone Handling (using standard library)
+
+# Logging and Configuration
+python-dotenv
+
+# API Framework (choose one)
+# flask-restful  # Uncomment if using Flask-RESTful
+# fastapi  # Uncomment if using FastAPI
+
+# GUI Interface
+streamlit
+
+# Development and Testing
+pytest
+pytest-flask
+
+# MCP Server libraries (for future AI integration)
+# mcp-server
+# mcp[cli]
+# fastmcp
