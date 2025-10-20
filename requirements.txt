@@ -20,8 +20,8 @@ sqlparse
 # Logging and Configuration
 python-dotenv
 
-# API Framework (choose one)
-# flask-restful  # Uncomment if using Flask-RESTful
+# API Framework and Documentation
+flask-restx
 fastapi 
 
 # GUI Interface

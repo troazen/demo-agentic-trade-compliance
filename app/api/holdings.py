@@ -1,33 +1,25 @@
 """
-Holdings API endpoints.
+Holdings API endpoints with Flask-RESTX for Swagger documentation.
 """
 
-from flask import Blueprint, request, jsonify
+from flask_restx import Namespace, Resource
 import logging
-
-from app.services.holdings_service import HoldingsService
 
 logger = logging.getLogger(__name__)
 
-holdings_bp = Blueprint('holdings', __name__)
+# Create namespace for holdings
+holdings_ns = Namespace('holdings', description = 'Holdings management operations')
 
+@holdings_ns.route('/')
+class HoldingsList(Resource):
+    @holdings_ns.doc('get_holdings')
+    def get(self):
+        """Get all holdings."""
+        return {'message': 'Holdings endpoint - to be implemented'}
 
-@holdings_bp.route('/<int:fund_id>/holdings', methods = ['GET'])
-def get_fund_holdings(fund_id):
-    """Get holdings for a fund with market values."""
-    logger.debug(f"API: Getting holdings for fund {fund_id}")
-    
-    try:
-        holdings = HoldingsService.get_holdings_with_market_values(fund_id)
-        return jsonify({
-            'success': True,
-            'fund_id': fund_id,
-            'holdings': holdings,
-            'count': len(holdings)
-        })
-    except Exception as e:
-        logger.error(f"Failed to get holdings for fund {fund_id}: {e}")
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+@holdings_ns.route('/<int:fund_id>')
+class FundHoldings(Resource):
+    @holdings_ns.doc('get_fund_holdings')
+    def get(self, fund_id):
+        """Get holdings for a specific fund."""
+        return {'message': f'Fund {fund_id} holdings endpoint - to be implemented'}

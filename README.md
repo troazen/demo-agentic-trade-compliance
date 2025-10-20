@@ -13,6 +13,7 @@ This application monitors compliance of trades placed in open-end 40 Act mutual 
 - **Portfolio Monitoring**: Track fund holdings and cash positions
 - **Alert System**: Override capabilities with detailed audit trails
 - **REST API**: External integration support for AI agents and automation
+- **Interactive Documentation**: Swagger UI for API exploration and testing
 
 ## Tech Stack
 
@@ -83,7 +84,14 @@ streamlit run [frontend_app.py]
 ### API Testing
 You can test the API endpoints directly:
 - Health check: `GET http://localhost:5000/api/health`
-- API documentation available at the respective endpoints
+- **Swagger UI Documentation**: `http://localhost:5000/swagger/`
+- **OpenAPI JSON Spec**: `http://localhost:5000/swagger.json`
+
+The Swagger UI provides interactive documentation where you can:
+- View all available endpoints
+- Test API calls directly from the browser
+- See request/response schemas
+- Explore the API structure
 
 **Health Check Successful Response**
 ```

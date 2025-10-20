@@ -39,9 +39,9 @@ def create_app(config_class = Config) -> Flask:
         ]
     )
     
-    # Register blueprints
-    from app.api import api_bp
-    app.register_blueprint(api_bp, url_prefix = '/api')
+    # Register API with Flask-RESTX
+    from app.api import api
+    api.init_app(app)
     
     # Create tables if they don't exist
     with app.app_context():
