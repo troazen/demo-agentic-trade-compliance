@@ -22,7 +22,7 @@ python-dotenv
 
 # API Framework (choose one)
 # flask-restful  # Uncomment if using Flask-RESTful
-# fastapi  # Uncomment if using FastAPI
+fastapi 
 
 # GUI Interface
 streamlit
