@@ -23,6 +23,7 @@ python-dotenv
 # API Framework and Documentation
 flask-restx
 fastapi 
+requests
 
 # GUI Interface
 streamlit
