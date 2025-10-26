@@ -385,3 +385,46 @@ class RuleValidateLogic(Resource):
                 'success': False,
                 'error': str(e)
             }, 500
+
+
+@rules_ns.route('/<int:rule_id>/test')
+class RuleTest(Resource):
+    @rules_ns.doc('test_rule')
+    @rules_ns.marshal_with(success_response)
+    def post(self, rule_id):
+        """Test a rule against a fund with optional simulated trade."""
+        logger.debug(f"API: Testing rule {rule_id}")
+        
+        try:
+            data = request.get_json()
+            if not data:
+                return {
+                    'success': False,
+                    'error': 'Request body is required'
+                }, 400
+            
+            if 'fund_id' not in data:
+                return {
+                    'success': False,
+                    'error': 'fund_id is required'
+                }, 400
+            
+            fund_id = data['fund_id']
+            test_trade = data.get('test_trade')
+            
+            # Test the rule
+            result = RuleService.test_rule(rule_id, fund_id, test_trade)
+            
+            if not result.get('success', False):
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Rule test failed')
+                }, 500
+            
+            return result
+        except Exception as e:
+            logger.error(f"Failed to test rule {rule_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }, 500

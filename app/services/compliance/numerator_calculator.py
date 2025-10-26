@@ -89,16 +89,24 @@ class NumeratorCalculator:
                     WHERE price_date = (
                         SELECT MAX(price_date)
                         FROM securities_price sp2
-                        WHERE sp2.ticker = securities_price.ticker
-                    )
+                    WHERE sp2.ticker = securities_price.ticker
+                )
                 ) sp ON hs.ticker = sp.ticker
                 INNER JOIN securities s ON hs.ticker = s.ticker
                 INNER JOIN issuers i ON s.issr_id = i.issr_id
                 WHERE hs.fund_id = :fund_id AND hs.trade_id = :trade_id
             """
         
-        # Add rule logic as WHERE clause
-        full_query = f"{base_query} AND ({rule_logic})"
+        # Add rule logic as WHERE clause - replace table name aliases
+        # Replace common table name patterns with their SQL aliases
+        if trade_id == 0:
+            # Portfolio compliance uses 'h' alias for holdings
+            processed_logic = rule_logic.replace('holdings.', 'h.').replace('issuers.', 'i.').replace('issuer.', 'i.').replace('securities.', 's.')
+        else:
+            # Trade compliance uses 'hs' alias for holdings_staging
+            processed_logic = rule_logic.replace('holdings.', 'hs.').replace('issuers.', 'i.').replace('issuer.', 'i.').replace('securities.', 's.')
+        
+        full_query = f"{base_query} AND ({processed_logic})"
         
         try:
             query = text(full_query)
@@ -249,8 +257,15 @@ class NumeratorCalculator:
                 WHERE hs.fund_id = :fund_id AND hs.trade_id = :trade_id
             """
         
-        # Add rule logic as WHERE clause
-        full_query = f"{base_query} AND ({rule_logic})"
+        # Add rule logic as WHERE clause - replace table name aliases
+        if trade_id == 0:
+            # Portfolio compliance uses 'h' alias for holdings
+            processed_logic = rule_logic.replace('holdings.', 'h.').replace('issuers.', 'i.').replace('issuer.', 'i.').replace('securities.', 's.')
+        else:
+            # Trade compliance uses 'hs' alias for holdings_staging
+            processed_logic = rule_logic.replace('holdings.', 'hs.').replace('issuers.', 'i.').replace('issuer.', 'i.').replace('securities.', 's.')
+        
+        full_query = f"{base_query} AND ({processed_logic})"
         
         try:
             query = text(full_query)

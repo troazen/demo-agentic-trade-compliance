@@ -473,3 +473,161 @@ class RuleService:
         
         logger.debug(f"Retrieved rule {rule_id} with {len(attachments)} attachments")
         return rule_data
+    
+    @staticmethod
+    def test_rule(rule_id: int, fund_id: int, test_trade: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+        """
+        Test a rule against a fund without persisting any data.
+        
+        Args:
+            rule_id: Rule ID to test
+            fund_id: Fund ID to test against
+            test_trade: Optional test trade details (ticker, direction, shares)
+            
+        Returns:
+            Dictionary with test results
+        """
+        logger.debug(f"Testing rule {rule_id} against fund {fund_id}")
+        
+        # Verify rule exists
+        rule = Rule.query.get(rule_id)
+        if not rule:
+            logger.error(f"Rule {rule_id} not found")
+            return {
+                'success': False,
+                'error': 'Rule not found'
+            }
+        
+        # Verify fund exists
+        fund = Fund.query.get(fund_id)
+        if not fund:
+            logger.error(f"Fund {fund_id} not found")
+            return {
+                'success': False,
+                'error': 'Fund not found'
+            }
+        
+        try:
+            from app.services.compliance.compliance_engine import ComplianceEngine
+            from app.services.holdings_service import HoldingsService
+            from decimal import Decimal
+            
+            # Determine test type
+            test_type = 'portfolio'
+            test_trade_details = None
+            
+            # If test_trade provided, simulate it
+            if test_trade:
+                test_type = 'trade'
+                ticker = test_trade.get('ticker')
+                direction = test_trade.get('direction')
+                shares = test_trade.get('shares')
+                
+                # Validate test trade
+                if not all([ticker, direction, shares]):
+                    return {
+                        'success': False,
+                        'error': 'test_trade requires ticker, direction, and shares'
+                    }
+                
+                # Copy holdings to staging
+                test_trade_id = 999999
+                HoldingsService.copy_holdings_to_staging(fund_id, test_trade_id)
+                
+                # Create a simple dict to represent the trade (don't create actual Trade object)
+                from app.constants import TradeDirection
+                from app.models import HoldingStaging
+                
+                # Manually apply the test trade to staging without creating a Trade object
+                direction_enum = TradeDirection(direction.upper())
+                
+                if direction_enum == TradeDirection.BUY:
+                    # Add shares to existing holding or create new
+                    staging_holding = HoldingStaging.query.filter_by(
+                        fund_id = fund_id,
+                        ticker = ticker,
+                        trade_id = test_trade_id
+                    ).first()
+                    
+                    if staging_holding:
+                        staging_holding.shares += Decimal(str(shares))
+                    else:
+                        staging_holding = HoldingStaging(
+                            fund_id = fund_id,
+                            ticker = ticker,
+                            trade_id = test_trade_id,
+                            shares = Decimal(str(shares))
+                        )
+                        db.session.add(staging_holding)
+                    db.session.commit()
+                elif direction_enum == TradeDirection.SELL:
+                    # Remove shares from existing holding
+                    staging_holding = HoldingStaging.query.filter_by(
+                        fund_id = fund_id,
+                        ticker = ticker,
+                        trade_id = test_trade_id
+                    ).first()
+                    
+                    if staging_holding:
+                        new_shares = staging_holding.shares - Decimal(str(shares))
+                        if new_shares <= 0:
+                            db.session.delete(staging_holding)
+                        else:
+                            staging_holding.shares = new_shares
+                        db.session.commit()
+                
+                test_trade_details = {
+                    'ticker': ticker,
+                    'direction': direction,
+                    'shares': int(shares)
+                }
+                trade_id = test_trade_id
+            else:
+                # Test against current holdings (portfolio mode)
+                HoldingsService.copy_holdings_to_staging(fund_id, 0)
+                trade_id = 0
+            
+            # Execute the rule
+            result = ComplianceEngine.execute_rule(fund_id, trade_id, rule)
+            
+            # Clean up staging
+            if test_type == 'trade':
+                # Clean up the test trade staging data
+                from app.models import HoldingStaging
+                HoldingStaging.query.filter_by(
+                    fund_id = fund_id,
+                    trade_id = 999999
+                ).delete()
+                try:
+                    db.session.commit()
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup test staging data: {e}")
+                    db.session.rollback()
+            
+            # Format response
+            response = {
+                'success': True,
+                'rule_id': rule.rule_id,
+                'rule_name': rule.rule_name,
+                'fund_id': fund_id,
+                'test_type': test_type,
+                'would_alert': result.get('alerted', False),
+                'calculated_percentage': float(result.get('calculated_percentage')) if result.get('calculated_percentage') else None,
+                'alert_level': float(rule.alert_level) if rule.alert_level else None,
+                'alert_if': rule.alert_if.value if rule.alert_if else None,
+                'alert_message': rule.alert_message,
+                'holdings_triggered': result.get('selected_holdings', [])
+            }
+            
+            if test_trade_details:
+                response['test_trade_details'] = test_trade_details
+            
+            logger.info(f"Rule {rule_id} test completed: would_alert={response['would_alert']}")
+            return response
+            
+        except Exception as e:
+            logger.error(f"Failed to test rule {rule_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }

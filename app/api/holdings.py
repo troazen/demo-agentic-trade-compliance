@@ -88,31 +88,3 @@ class FundHoldings(Resource):
                 'error': str(e)
             }, 500
 
-
-@holdings_ns.route('/fund/<int:fund_id>/compliance-check')
-class FundComplianceCheck(Resource):
-    @holdings_ns.doc('run_portfolio_compliance_check')
-    @holdings_ns.marshal_with(success_response)
-    def post(self, fund_id):
-        """Run batch portfolio compliance check for a fund."""
-        logger.debug(f"API: Running portfolio compliance check for fund {fund_id}")
-        
-        try:
-            from app.services.compliance.portfolio_compliance import PortfolioCompliance
-            
-            # Run portfolio compliance check
-            result = PortfolioCompliance.check_fund_compliance(fund_id)
-            
-            return {
-                'success': True,
-                'alerts': result.get('alerts', []),
-                'alerts_count': result.get('alerts_count', 0),
-                'rules_checked': result.get('rules_checked', 0),
-                'fund_id': fund_id
-            }
-        except Exception as e:
-            logger.error(f"Failed to run compliance check for fund {fund_id}: {e}")
-            return {
-                'success': False,
-                'error': str(e)
-            }, 500

@@ -267,7 +267,41 @@ compliance_check_response = Model('ComplianceCheckResponse', {
     'fund_id': fields.Integer(description = 'Fund ID')
 })
 
+# Rule test models
+rule_test_request = Model('RuleTestRequest', {
+    'fund_id': fields.Integer(required = True, description = 'Fund ID to test against'),
+    'test_trade': fields.Raw(description = 'Optional test trade details {ticker, direction, shares}')
+})
+
+rule_test_response = Model('RuleTestResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'rule_id': fields.Integer(description = 'Rule ID'),
+    'rule_name': fields.String(description = 'Rule name'),
+    'fund_id': fields.Integer(description = 'Fund ID'),
+    'test_type': fields.String(description = 'Type of test (portfolio or trade)'),
+    'would_alert': fields.Boolean(description = 'Whether the rule would alert'),
+    'calculated_percentage': fields.Float(description = 'Calculated percentage'),
+    'alert_level': fields.Float(description = 'Alert threshold level'),
+    'alert_if': fields.String(description = 'Alert condition'),
+    'alert_message': fields.String(description = 'Alert message'),
+    'holdings_triggered': fields.Raw(description = 'Holdings that triggered the alert'),
+    'test_trade_details': fields.Raw(description = 'Test trade details if applicable')
+})
+
+# Compliance check response model
+compliance_check_response = Model('ComplianceCheckResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'fund_id': fields.Integer(description = 'Fund ID'),
+    'rules_checked': fields.Integer(description = 'Number of rules checked'),
+    'alerts': fields.List(fields.Raw, description = 'List of alerts'),
+    'alerts_count': fields.Integer(description = 'Number of alerts'),
+    'alerted': fields.Boolean(description = 'Whether any alerts were generated'),
+    'message': fields.String(description = 'Result message')
+})
+
 # Register additional models
 api.models[holdings_list_response.name] = holdings_list_response
 api.models[fund_holdings_response.name] = fund_holdings_response
 api.models[compliance_check_response.name] = compliance_check_response
+api.models[rule_test_request.name] = rule_test_request
+api.models[rule_test_response.name] = rule_test_response

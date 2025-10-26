@@ -247,3 +247,52 @@ class FundCreate(Resource):
                 'success': False,
                 'error': str(e)
             }, 500
+
+
+@funds_ns.route('/<int:fund_id>/compliance-check')
+class FundComplianceCheck(Resource):
+    @funds_ns.doc('run_portfolio_compliance_check')
+    @funds_ns.marshal_with(success_response)
+    def post(self, fund_id):
+        """Run portfolio compliance check for a fund."""
+        logger.debug(f"API: Running portfolio compliance check for fund {fund_id}")
+        
+        try:
+            from app.services.compliance.portfolio_compliance import PortfolioComplianceService
+            
+            # Verify fund exists
+            fund = FundService.get_fund_by_id(fund_id)
+            if not fund:
+                return {
+                    'success': False,
+                    'error': 'Fund not found'
+                }, 404
+            
+            # Run portfolio compliance check
+            result = PortfolioComplianceService.run_portfolio_compliance(fund_id)
+            
+            if not result.get('success', False):
+                return {
+                    'success': False,
+                    'error': result.get('error', 'Portfolio compliance check failed')
+                }, 500
+            
+            # Get count of rules checked
+            from app.services.compliance.portfolio_compliance import PortfolioComplianceService
+            rules = PortfolioComplianceService._get_portfolio_compliance_rules(fund_id)
+            
+            return {
+                'success': True,
+                'fund_id': fund_id,
+                'rules_checked': len(rules),
+                'alerts': result.get('alerts', []),
+                'alerts_count': len(result.get('alerts', [])),
+                'alerted': result.get('alerted', False),
+                'message': result.get('message', 'Compliance check completed')
+            }
+        except Exception as e:
+            logger.error(f"Failed to run compliance check for fund {fund_id}: {e}")
+            return {
+                'success': False,
+                'error': str(e)
+            }, 500
