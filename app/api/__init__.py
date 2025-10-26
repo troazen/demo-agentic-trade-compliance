@@ -11,6 +11,7 @@ from app.services.holdings_service import HoldingsService
 from app.services.security_service import SecurityService
 from app.services.trade_service import TradeService
 from app.services.alert_service import AlertService
+from app.services.rule_service import RuleService
 
 # Create Flask-RESTX API instance
 api = Api(

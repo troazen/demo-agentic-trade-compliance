@@ -87,12 +87,19 @@ security_model = Model('Security', {
     'name': fields.String(description = 'Security name'),
     'type': fields.String(description = 'Security type'),
     'shares_outstanding': fields.Integer(description = 'Number of shares outstanding'),
-    'market_cap': fields.Integer(description = 'Market capitalization')
+    'market_cap': fields.Integer(description = 'Market capitalization'),
+    'current_price': fields.Float(description = 'Current price'),
+    'issuer': fields.Raw(description = 'Issuer information')
+})
+
+security_with_issuer = Model('SecurityWithIssuer', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'security': fields.Nested(security_model, description = 'Security details')
 })
 
 securities_list_response = Model('SecuritiesListResponse', {
     'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
-    'securities': fields.List(fields.Nested(security_model), description = 'List of securities'),
+    'securities': fields.List(fields.Raw, description = 'List of securities'),
     'count': fields.Integer(description = 'Number of securities returned')
 })
 
@@ -134,12 +141,44 @@ rule_model = Model('Rule', {
     'portfolio_compliance_mode': fields.Boolean(description = 'Whether rule runs on portfolio'),
     'active': fields.Boolean(description = 'Whether rule is active'),
     'created_at': fields.DateTime(description = 'Rule creation timestamp'),
-    'updated_at': fields.DateTime(description = 'Last update timestamp')
+    'updated_at': fields.DateTime(description = 'Last update timestamp'),
+    'attachments': fields.Raw(description = 'Fund attachments')
+})
+
+rule_create_request = Model('RuleCreateRequest', {
+    'rule_name': fields.String(required = True, description = 'Name of the rule'),
+    'alert_message': fields.String(required = True, description = 'Alert message'),
+    'denominator': fields.String(required = True, description = 'Denominator type'),
+    'logic': fields.String(description = 'SQL logic (optional)'),
+    'alert_if': fields.String(description = 'Alert condition (above/below)'),
+    'alert_level': fields.Float(description = 'Alert threshold level'),
+    'trade_compliance_mode': fields.Boolean(description = 'Run on trades', default = True),
+    'portfolio_compliance_mode': fields.Boolean(description = 'Run on portfolio', default = True)
+})
+
+rule_update_request = Model('RuleUpdateRequest', {
+    'rule_name': fields.String(description = 'Name of the rule'),
+    'alert_message': fields.String(description = 'Alert message'),
+    'logic': fields.String(description = 'SQL logic'),
+    'denominator': fields.String(description = 'Denominator type'),
+    'alert_if': fields.String(description = 'Alert condition'),
+    'alert_level': fields.Float(description = 'Alert threshold level'),
+    'trade_compliance_mode': fields.Boolean(description = 'Run on trades'),
+    'portfolio_compliance_mode': fields.Boolean(description = 'Run on portfolio')
+})
+
+rule_attach_request = Model('RuleAttachRequest', {
+    'fund_ids': fields.List(fields.Integer, required = True, description = 'List of fund IDs to attach to')
+})
+
+rule_response = Model('RuleResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'rule': fields.Raw(description = 'Rule details')
 })
 
 rules_list_response = Model('RulesListResponse', {
     'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
-    'rules': fields.List(fields.Nested(rule_model), description = 'List of compliance rules'),
+    'rules': fields.List(fields.Raw, description = 'List of compliance rules'),
     'count': fields.Integer(description = 'Number of rules returned')
 })
 
@@ -151,14 +190,23 @@ alert_model = Model('Alert', {
     'trade_id': fields.Integer(description = 'Trade identifier (if trade-related)'),
     'alert_message': fields.String(description = 'Alert message'),
     'calculated_percentage': fields.Float(description = 'Calculated percentage that triggered alert'),
-    'action_taken': fields.String(description = 'Action taken (override/cancel)'),
+    'status': fields.String(description = 'Alert status (pending/overridden/cancelled)'),
     'override_reason': fields.String(description = 'Override reason if applicable'),
     'created_at': fields.DateTime(description = 'Alert creation timestamp')
 })
 
+alert_override_request = Model('AlertOverrideRequest', {
+    'reason': fields.String(required = True, description = 'Reason for overriding the alert')
+})
+
+alert_response = Model('AlertResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'alert': fields.Raw(description = 'Alert details')
+})
+
 alerts_list_response = Model('AlertsListResponse', {
     'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
-    'alerts': fields.List(fields.Nested(alert_model), description = 'List of alerts'),
+    'alerts': fields.List(fields.Raw, description = 'List of alerts'),
     'count': fields.Integer(description = 'Number of alerts returned')
 })
 
@@ -176,11 +224,50 @@ api.models[total_assets_response.name] = total_assets_response
 api.models[net_assets_response.name] = net_assets_response
 api.models[total_assets_ex_cash_response.name] = total_assets_ex_cash_response
 api.models[security_model.name] = security_model
-api.models[securities_list_response.name] = securities_list_response
+api.models[security_with_issuer.name] = security_with_issuer
+securities_list_response = api.models[securities_list_response.name] = securities_list_response
 api.models[trade_model.name] = trade_model
 api.models[trade_create_request.name] = trade_create_request
 api.models[trade_response.name] = trade_response
+trades_list_response = Model('TradesListResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'trades': fields.List(fields.Raw, description = 'List of trades'),
+    'count': fields.Integer(description = 'Number of trades returned')
+})
 api.models[rule_model.name] = rule_model
+api.models[rule_create_request.name] = rule_create_request
+api.models[rule_update_request.name] = rule_update_request
+api.models[rule_attach_request.name] = rule_attach_request
+api.models[rule_response.name] = rule_response
 api.models[rules_list_response.name] = rules_list_response
 api.models[alert_model.name] = alert_model
+api.models[alert_override_request.name] = alert_override_request
+api.models[alert_response.name] = alert_response
 api.models[alerts_list_response.name] = alerts_list_response
+
+# Holdings models
+holdings_list_response = Model('HoldingsListResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'holdings': fields.List(fields.Raw, description = 'List of holdings'),
+    'count': fields.Integer(description = 'Number of holdings returned')
+})
+
+fund_holdings_response = Model('FundHoldingsResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'fund': fields.Raw(description = 'Fund details'),
+    'holdings': fields.List(fields.Raw, description = 'List of holdings'),
+    'holdings_count': fields.Integer(description = 'Number of holdings')
+})
+
+compliance_check_response = Model('ComplianceCheckResponse', {
+    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
+    'alerts': fields.List(fields.Raw, description = 'List of alerts'),
+    'alerts_count': fields.Integer(description = 'Number of alerts'),
+    'rules_checked': fields.Integer(description = 'Number of rules checked'),
+    'fund_id': fields.Integer(description = 'Fund ID')
+})
+
+# Register additional models
+api.models[holdings_list_response.name] = holdings_list_response
+api.models[fund_holdings_response.name] = fund_holdings_response
+api.models[compliance_check_response.name] = compliance_check_response
