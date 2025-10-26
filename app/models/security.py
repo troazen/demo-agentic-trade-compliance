@@ -16,6 +16,12 @@ from app.config import get_eastern_time
 logger = logging.getLogger(__name__)
 
 
+def get_securities_price_model():
+    """Get SecuritiesPrice model to avoid circular imports."""
+    from app.models.securities_price import SecuritiesPrice
+    return SecuritiesPrice
+
+
 class Security(db.Model):
     """
     Security model representing financial instruments (equity stocks).
@@ -77,6 +83,7 @@ class Security(db.Model):
         """
         logger.debug(f"Getting latest price for security {self.ticker}")
         
+        SecuritiesPrice = get_securities_price_model()
         latest_price_record = SecuritiesPrice.query.filter_by(
             ticker = self.ticker
         ).order_by(SecuritiesPrice.price_date.desc()).first()
@@ -100,6 +107,7 @@ class Security(db.Model):
         """
         logger.debug(f"Getting price for security {self.ticker} on {target_date}")
         
+        SecuritiesPrice = get_securities_price_model()
         price_record = SecuritiesPrice.query.filter_by(
             ticker = self.ticker,
             price_date = target_date.date()

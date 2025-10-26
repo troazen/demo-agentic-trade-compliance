@@ -1,14 +1,29 @@
 """
 Sample data seeding script for the Investment Operations Compliance System.
+
+This script initializes the database with data from Investment_Data.json when available,
+or falls back to hardcoded sample data. It is automatically invoked on app startup
+in development and testing environments when the database is empty.
+
+To run manually:
+    python scripts/seed_data.py
+
+The script will:
+    1. Load Investment_Data.json if available
+    2. Create issuers and securities from JSON data
+    3. Map GICS classifications and country data
+    4. Generate historical price data
+    5. Create sample funds, holdings, rules, and attachments
 """
 
 import logging
-
+import json
 import os
 import sys
 from decimal import Decimal
 from datetime import datetime, date, timedelta
 import random
+from typing import Dict, List, Any, Optional
 
 # Add the app directory to Python path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'app'))
@@ -19,6 +34,292 @@ from app.constants import TradeDirection, DenominatorType, AlertIf
 from app.config import Config
 
 logger = logging.getLogger(__name__)
+
+
+def load_json_data(json_file_path: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Load and parse Investment_Data.json file.
+    
+    Args:
+        json_file_path: Path to the JSON file (relative to project root if not absolute)
+        
+    Returns:
+        Dictionary containing parsed JSON data
+    """
+    # Default to looking in the project root
+    if json_file_path is None:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_root = os.path.dirname(script_dir)
+        json_file_path = os.path.join(project_root, 'Investment_Data.json')
+    
+    logger.info(f"Loading JSON data from {json_file_path}")
+    
+    if not os.path.exists(json_file_path):
+        logger.warning(f"JSON file not found: {json_file_path}")
+        return {}
+    
+    try:
+        with open(json_file_path, 'r', encoding = 'utf-8') as f:
+            data = json.load(f)
+        logger.info("JSON data loaded successfully")
+        return data
+    except Exception as e:
+        logger.error(f"Failed to load JSON data: {e}")
+        return {}
+
+
+def extract_table_data(json_data: Dict[str, Any], table_name: str) -> Dict[str, Any]:
+    """
+    Extract specific table data from JSON structure.
+    
+    Args:
+        json_data: Parsed JSON data
+        table_name: Name of the table to extract
+        
+    Returns:
+        Dictionary containing table structure and rows
+    """
+    if 'objects' not in json_data:
+        logger.warning("No 'objects' key in JSON data")
+        return {}
+    
+    for obj in json_data['objects']:
+        if obj.get('name') == table_name and obj.get('type') == 'table':
+            logger.info(f"Found table '{table_name}' with {len(obj.get('rows', []))} rows")
+            return obj
+    
+    logger.warning(f"Table '{table_name}' not found in JSON data")
+    return {}
+
+
+def build_gics_lookup(json_data: Dict[str, Any]) -> Dict[str, Dict[str, str]]:
+    """
+    Build lookup dictionaries for GICS classification.
+    
+    Args:
+        json_data: Parsed JSON data
+        
+    Returns:
+        Dictionary mapping Primary_ID to GICS data for each category
+    """
+    lookups = {
+        'sectors': {},
+        'industry_groups': {},
+        'industries': {},
+        'sub_industries': {}
+    }
+    
+    for table_name in lookups.keys():
+        table_data = extract_table_data(json_data, table_name)
+        if 'rows' in table_data and 'columns' in table_data:
+            columns = [col['name'] for col in table_data['columns']]
+            for row in table_data['rows']:
+                if len(row) >= 3:
+                    primary_id = row[0]
+                    code = row[1]
+                    name = row[2]
+                    lookups[table_name][primary_id] = {'code': code, 'name': name}
+    
+    logger.info(f"Built GICS lookups: {sum(len(v) for v in lookups.values())} total entries")
+    return lookups
+
+
+def build_country_lookup(json_data: Dict[str, Any]) -> Dict[str, str]:
+    """
+    Build lookup dictionary for country data.
+    
+    Args:
+        json_data: Parsed JSON data
+        
+    Returns:
+        Dictionary mapping country code to country name
+    """
+    countries = extract_table_data(json_data, 'countries')
+    country_lookup = {}
+    
+    if 'rows' in countries:
+        for row in countries['rows']:
+            if len(row) >= 2:
+                country_code = row[0]
+                country_name = row[1]
+                country_lookup[country_code] = country_name
+    
+    logger.info(f"Built country lookup with {len(country_lookup)} countries")
+    return country_lookup
+
+
+def create_issuers_from_json(json_data: Dict[str, Any], gics_lookups: Dict[str, Dict[str, Dict[str, str]]], 
+                              country_lookup: Dict[str, str]) -> List[Issuer]:
+    """
+    Map JSON issuers table to application issuers schema with GICS and country data.
+    
+    Args:
+        json_data: Parsed JSON data
+        gics_lookups: GICS classification lookup dictionaries
+        country_lookup: Country code to name lookup
+        
+    Returns:
+        List of created Issuer objects
+    """
+    logger.info("Creating issuers from JSON data")
+    
+    issuers_table = extract_table_data(json_data, 'issuers')
+    if not issuers_table or 'rows' not in issuers_table:
+        logger.warning("No issuers table found in JSON, creating empty list")
+        return []
+    
+    issuers = []
+    unique_issuers = {}  # Use Issuer_Name as key to avoid duplicates
+    
+    # Only get "Ultimate Parent Issuer" or "Parent Issuer" types from JSON
+    party_type_col_idx = 4  # Party_Type is the 5th column (index 4)
+    issuer_code_col_idx = 0
+    issuer_name_col_idx = 2
+    country_code_col_idx = 3
+    
+    for row in issuers_table['rows']:
+        if len(row) > party_type_col_idx:
+            party_type = row[party_type_col_idx]
+            issuer_name = row[issuer_name_col_idx]
+            
+            # Only process Ultimate Parent and Parent issuers (skip sub-issuers)
+            if party_type in ('Ultimate Parent Issuer', 'Parent Issuer'):
+                if issuer_name not in unique_issuers:
+                    unique_issuers[issuer_name] = {
+                        'name': issuer_name,
+                        'country_code': row[country_code_col_idx] if len(row) > country_code_col_idx else None,
+                        'issuer_code': row[issuer_code_col_idx]
+                    }
+    
+    logger.info(f"Found {len(unique_issuers)} unique parent issuers from JSON")
+    
+    # Create issuer objects
+    for issuer_name, issuer_data in unique_issuers.items():
+        country_code = issuer_data.get('country_code')
+        country_name = country_lookup.get(country_code, '') if country_code else None
+        
+        issuer = Issuer(
+            name = issuer_data['name'],
+            country_domicile_code = country_code if country_code else None,
+            country_incorporation_code = country_code if country_code else None,
+            country_domicile = country_name,
+            country_incorporation = country_name
+        )
+        
+        db.session.add(issuer)
+        issuers.append(issuer)
+    
+    db.session.commit()
+    logger.info(f"Created {len(issuers)} issuers from JSON data")
+    return issuers
+
+
+def create_securities_from_json(json_data: Dict[str, Any], issuers: List[Issuer], 
+                                 gics_lookups: Dict[str, Dict[str, Dict[str, str]]],
+                                 country_lookup: Dict[str, str]) -> List[Security]:
+    """
+    Map JSON companies table to application securities schema.
+    
+    Args:
+        json_data: Parsed JSON data
+        issuers: List of created issuer objects
+        gics_lookups: GICS classification lookup dictionaries
+        country_lookup: Country code to name lookup
+        
+    Returns:
+        List of created Security objects
+    """
+    logger.info("Creating securities from JSON data")
+    
+    companies_table = extract_table_data(json_data, 'companies')
+    if not companies_table or 'rows' not in companies_table:
+        logger.warning("No companies table found in JSON, creating empty list")
+        return []
+    
+    securities = []
+    issuer_name_lookup = {issuer.name: issuer for issuer in issuers}
+    
+    # Company table columns: Primary_ID, Ticker, Name, Sector_FK, Industry_Group_FK, Industry_FK, Sub_Industry_FK, Issuer_Code
+    ticker_col = 1
+    name_col = 2
+    sector_fk_col = 3
+    industry_grp_fk_col = 4
+    industry_fk_col = 5
+    sub_industry_fk_col = 6
+    issuer_code_col = 7
+    
+    for row in companies_table['rows']:
+        if len(row) <= ticker_col or row[ticker_col] is None:
+            continue
+        
+        ticker = row[ticker_col]
+        security_name = row[name_col]
+        
+        # Map GICS data
+        sector_fk = row[sector_fk_col] if len(row) > sector_fk_col else None
+        industry_grp_fk = row[industry_grp_fk_col] if len(row) > industry_grp_fk_col else None
+        industry_fk = row[industry_fk_col] if len(row) > industry_fk_col else None
+        sub_industry_fk = row[sub_industry_fk_col] if len(row) > sub_industry_fk_col else None
+        
+        # Find matching issuer - try to match by security name
+        issuer = None
+        for iss in issuers:
+            if iss.name.lower() in security_name.lower() or security_name.lower() in iss.name.lower():
+                issuer = iss
+                break
+        
+        # If no match found, try to find a generic issuer
+        if issuer is None:
+            # Check if we can find an issuer with similar name (partial match)
+            for iss in issuers:
+                security_words = set(security_name.lower().split())
+                issuer_words = set(iss.name.lower().split())
+                # If there's some overlap in words, use this issuer
+                if security_words & issuer_words:
+                    issuer = iss
+                    break
+        
+        # If still no match, create a placeholder issuer
+        if issuer is None:
+            if len(securities) < 10:  # Only log for first few securities to reduce noise
+                logger.debug(f"No issuer found for security {ticker}, creating placeholder issuer")
+            issuer = Issuer(
+                name = security_name,
+                country_domicile_code = 'US',
+                country_incorporation_code = 'US',
+                country_domicile = 'United States',
+                country_incorporation = 'United States'
+            )
+            db.session.add(issuer)
+            db.session.flush()
+        
+        # Update issuer GICS data if available
+        if sector_fk and sector_fk in gics_lookups.get('sectors', {}):
+            issuer.gics_sector = gics_lookups['sectors'][sector_fk]['name']
+        
+        if industry_grp_fk and industry_grp_fk in gics_lookups.get('industry_groups', {}):
+            issuer.gics_industry_grp = gics_lookups['industry_groups'][industry_grp_fk]['name']
+        
+        if industry_fk and industry_fk in gics_lookups.get('industries', {}):
+            issuer.gics_industry = gics_lookups['industries'][industry_fk]['name']
+        
+        if sub_industry_fk and sub_industry_fk in gics_lookups.get('sub_industries', {}):
+            issuer.gics_sub_industry = gics_lookups['sub_industries'][sub_industry_fk]['name']
+        
+        # Create security
+        security = Security(
+            ticker = ticker,
+            name = security_name,
+            issr_id = issuer.issr_id,
+            shares_outstanding = random.randint(1000000, 50000000)  # Random placeholder
+        )
+        
+        db.session.add(security)
+        securities.append(security)
+    
+    db.session.commit()
+    logger.info(f"Created {len(securities)} securities from JSON data")
+    return securities
 
 
 def create_sample_issuers():
@@ -414,10 +715,29 @@ def main():
         db.drop_all()
         db.create_all()
         
-        # Create sample data
-        issuers = create_sample_issuers()
-        securities = create_sample_securities(issuers)
-        create_sample_prices(securities)
+        # Load JSON data
+        json_data = load_json_data()
+        
+        # Build lookups from JSON
+        gics_lookups = build_gics_lookup(json_data)
+        country_lookup = build_country_lookup(json_data)
+        
+        # Create issuers and securities from JSON
+        if json_data:
+            logger.info("Creating issuers and securities from JSON data")
+            issuers = create_issuers_from_json(json_data, gics_lookups, country_lookup)
+            securities = create_securities_from_json(json_data, issuers, gics_lookups, country_lookup)
+        else:
+            logger.info("JSON data not available, using sample data")
+            # Fall back to sample data if JSON is not available
+            issuers = create_sample_issuers()
+            securities = create_sample_securities(issuers)
+        
+        # Generate price data
+        if securities:
+            create_sample_prices(securities)
+        
+        # Create sample data for remaining tables
         funds = create_sample_funds()
         create_sample_holdings(funds, securities)
         rules = create_sample_rules()

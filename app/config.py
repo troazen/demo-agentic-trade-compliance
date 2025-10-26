@@ -13,6 +13,9 @@ class Config:
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///compliance_system.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     
+    # Automatic database initialization
+    AUTO_INITIALIZE_DB = os.environ.get('AUTO_INITIALIZE_DB', 'False').lower() == 'true'
+    
     # Timezone configuration (US Eastern - UTC-5 or UTC-4 depending on DST)
     # For simplicity, we'll use UTC-5 (EST) - in production you might want to handle DST
     TIMEZONE_OFFSET = timedelta(hours = -5)
@@ -35,6 +38,7 @@ class DevelopmentConfig(Config):
     """Development configuration."""
     DEBUG = True
     LOG_LEVEL = 'DEBUG'
+    AUTO_INITIALIZE_DB = True
 
 
 class ProductionConfig(Config):
@@ -48,6 +52,7 @@ class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
     LOG_LEVEL = 'WARNING'
+    AUTO_INITIALIZE_DB = True
 
 
 # Configuration mapping
