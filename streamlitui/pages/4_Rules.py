@@ -47,66 +47,71 @@ try:
     
     if not filtered_rules:
         st.info("No rules found matching the filters.")
-        return
-    
-    # Display rules in a table
-    rules_data = []
-    for rule in filtered_rules:
-        rules_data.append({
-            'Rule ID': rule.get('rule_id'),
-            'Rule Name': rule.get('rule_name'),
-            'Denominator': rule.get('denominator', 'N/A'),
-            'Alert If': rule.get('alert_if', 'N/A'),
-            'Alert Level': f"{rule.get('alert_level', 0):.2f}%" if rule.get('alert_level') is not None else 'N/A',
-            'Trade Mode': format_boolean(rule.get('trade_compliance_mode', False)),
-            'Portfolio Mode': format_boolean(rule.get('portfolio_compliance_mode', False)),
-            'Active': format_boolean(rule.get('active', False)),
-            'Attached Funds': len(rule.get('attached_funds', [])),
-            'Created': format_datetime(rule.get('created_at'))
-        })
-    
-    st.dataframe(rules_data, use_container_width = True, hide_index = True)
-    
-    # Rule details
-    st.markdown("---")
-    st.subheader("Rule Details")
-    
-    selected_rule_id = st.selectbox(
-        "Select a rule to view details",
-        options = [r.get('rule_id') for r in filtered_rules],
-        format_func = lambda x: next((f"{r['rule_name']} (ID: {r['rule_id']})" for r in filtered_rules if r['rule_id'] == x), f'Rule {x}')
-    )
-    
-    if selected_rule_id:
-        try:
-            rule_details = api_client.get_rule(selected_rule_id)
-            
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.markdown(f"**Rule Name:** {rule_details.get('rule_name')}")
-                st.markdown(f"**Alert Message:** {rule_details.get('alert_message', 'N/A')}")
-                st.markdown(f"**Denominator:** {rule_details.get('denominator', 'N/A')}")
-                st.markdown(f"**Alert If:** {rule_details.get('alert_if', 'N/A')}")
-                st.markdown(f"**Alert Level:** {format_percentage(rule_details.get('alert_level', 0)) if rule_details.get('alert_level') is not None else 'N/A'}")
-            
-            with col2:
-                st.markdown(f"**Trade Mode:** {format_boolean(rule_details.get('trade_compliance_mode', False))}")
-                st.markdown(f"**Portfolio Mode:** {format_boolean(rule_details.get('portfolio_compliance_mode', False))}")
-                st.markdown(f"**Active:** {format_boolean(rule_details.get('active', False))}")
-                st.markdown(f"**Logic:** {rule_details.get('logic', 'N/A')}")
-            
-            # Attached funds
-            if rule_details.get('attached_funds'):
-                st.markdown("### Attached Funds")
-                for fund in rule_details.get('attached_funds', []):
-                    st.markdown(f"- {fund.get('fund_name', 'N/A')} (ID: {fund.get('fund_id')})")
-            else:
-                st.info("This rule is not attached to any funds.")
+    else:
+        # Display rules in a table
+        rules_data = []
+        for rule in filtered_rules:
+            rules_data.append({
+                'Rule ID': rule.get('rule_id'),
+                'Rule Name': rule.get('rule_name'),
+                'Denominator': rule.get('denominator', 'N/A'),
+                'Alert If': rule.get('alert_if', 'N/A'),
+                'Alert Level': f"{rule.get('alert_level', 0):.2f}%" if rule.get('alert_level') is not None else 'N/A',
+                'Trade Mode': format_boolean(rule.get('trade_compliance_mode', False)),
+                'Portfolio Mode': format_boolean(rule.get('portfolio_compliance_mode', False)),
+                'Active': format_boolean(rule.get('active', False)),
+                'Attached Funds': len(rule.get('attached_funds', [])),
+                'Created': format_datetime(rule.get('created_at'))
+            })
         
-        except Exception as e:
-            st.error(f"Error loading rule details: {e}")
+        st.dataframe(rules_data, use_container_width = True, hide_index = True)
+        
+        # Rule details
+        st.markdown("---")
+        st.subheader("Rule Details")
+        
+        selected_rule_id = st.selectbox(
+            "Select a rule to view details",
+            options = [r.get('rule_id') for r in filtered_rules],
+            format_func = lambda x: next((f"{r['rule_name']} (ID: {r['rule_id']})" for r in filtered_rules if r['rule_id'] == x), f'Rule {x}')
+        )
+        
+        if selected_rule_id:
+            try:
+                rule_details = api_client.get_rule(selected_rule_id)
+                
+                if not rule_details:
+                    st.warning(f"Rule details not found for rule ID '{selected_rule_id}'. The rule may not exist in the database or may be missing required data.")
+                else:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        st.markdown(f"**Rule Name:** {rule_details.get('rule_name', 'N/A')}")
+                        st.markdown(f"**Alert Message:** {rule_details.get('alert_message', 'N/A')}")
+                        st.markdown(f"**Denominator:** {rule_details.get('denominator', 'N/A')}")
+                        st.markdown(f"**Alert If:** {rule_details.get('alert_if', 'N/A')}")
+                        st.markdown(f"**Alert Level:** {format_percentage(rule_details.get('alert_level', 0)) if rule_details.get('alert_level') is not None else 'N/A'}")
+                    
+                    with col2:
+                        st.markdown(f"**Trade Mode:** {format_boolean(rule_details.get('trade_compliance_mode', False))}")
+                        st.markdown(f"**Portfolio Mode:** {format_boolean(rule_details.get('portfolio_compliance_mode', False))}")
+                        st.markdown(f"**Active:** {format_boolean(rule_details.get('active', False))}")
+                        st.markdown(f"**Logic:** {rule_details.get('logic', 'N/A')}")
+                    
+                    # Attached funds
+                    attached_funds = rule_details.get('attached_funds')
+                    if attached_funds and isinstance(attached_funds, list) and len(attached_funds) > 0:
+                        st.markdown("### Attached Funds")
+                        for fund in attached_funds:
+                            if isinstance(fund, dict):
+                                st.markdown(f"- {fund.get('fund_name', 'N/A')} (ID: {fund.get('fund_id', 'N/A')})")
+                            else:
+                                st.markdown(f"- {fund}")
+                    else:
+                        st.info("This rule is not attached to any funds.")
+            
+            except Exception as e:
+                st.error(f"Error loading rule details: {e}")
 
 except Exception as e:
     st.error(f"Error loading rules: {e}")
-

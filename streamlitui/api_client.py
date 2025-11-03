@@ -76,10 +76,15 @@ class APIClient:
         response = self._make_request('GET', '/api/funds/')
         return response.get('funds', [])
     
-    def get_fund(self, fund_id: int) -> Dict[str, Any]:
+    def get_fund(self, fund_id: int) -> Optional[Dict[str, Any]]:
         """Get fund details with holdings."""
-        response = self._make_request('GET', f'/api/funds/{fund_id}')
-        return response.get('fund')
+        try:
+            response = self._make_request('GET', f'/api/funds/{fund_id}')
+            fund = response.get('fund')
+            return fund if fund else None
+        except Exception as e:
+            logger.warning(f"Failed to get fund {fund_id}: {e}")
+            return None
     
     def update_fund_cash(self, fund_id: int, cash: float) -> bool:
         """Update fund cash amount."""
@@ -107,10 +112,15 @@ class APIClient:
         response = self._make_request('GET', '/api/securities/search', params = {'q': query})
         return response.get('securities', [])
     
-    def get_security(self, ticker: str) -> Dict[str, Any]:
+    def get_security(self, ticker: str) -> Optional[Dict[str, Any]]:
         """Get security details by ticker."""
-        response = self._make_request('GET', f'/api/securities/{ticker}')
-        return response.get('security')
+        try:
+            response = self._make_request('GET', f'/api/securities/{ticker}')
+            security = response.get('security')
+            return security if security else None
+        except Exception as e:
+            logger.warning(f"Failed to get security {ticker}: {e}")
+            return None
     
     def get_security_price(self, ticker: str) -> float:
         """Get current price for a security."""
@@ -139,10 +149,15 @@ class APIClient:
         )
         return response
     
-    def get_trade(self, trade_id: int) -> Dict[str, Any]:
+    def get_trade(self, trade_id: int) -> Optional[Dict[str, Any]]:
         """Get trade details by ID."""
-        response = self._make_request('GET', f'/api/trades/{trade_id}')
-        return response.get('trade')
+        try:
+            response = self._make_request('GET', f'/api/trades/{trade_id}')
+            trade = response.get('trade')
+            return trade if trade else None
+        except Exception as e:
+            logger.warning(f"Failed to get trade {trade_id}: {e}")
+            return None
     
     def override_trade(self, trade_id: int, alerts: Dict[int, Dict[str, str]]) -> bool:
         """Override trade alerts and proceed."""
@@ -180,10 +195,15 @@ class APIClient:
         response = self._make_request('GET', '/api/rules/', params = params)
         return response.get('rules', [])
     
-    def get_rule(self, rule_id: int) -> Dict[str, Any]:
+    def get_rule(self, rule_id: int) -> Optional[Dict[str, Any]]:
         """Get rule details including attachments."""
-        response = self._make_request('GET', f'/api/rules/{rule_id}')
-        return response.get('rule')
+        try:
+            response = self._make_request('GET', f'/api/rules/{rule_id}')
+            rule = response.get('rule')
+            return rule if rule else None
+        except Exception as e:
+            logger.warning(f"Failed to get rule {rule_id}: {e}")
+            return None
     
     def create_rule(
         self,
@@ -332,10 +352,15 @@ class APIClient:
         response = self._make_request('GET', '/api/alerts/', params = params)
         return response.get('alerts', [])
     
-    def get_alert(self, alert_id: int) -> Dict[str, Any]:
+    def get_alert(self, alert_id: int) -> Optional[Dict[str, Any]]:
         """Get alert details by ID."""
-        response = self._make_request('GET', f'/api/alerts/{alert_id}')
-        return response.get('alert')
+        try:
+            response = self._make_request('GET', f'/api/alerts/{alert_id}')
+            alert = response.get('alert')
+            return alert if alert else None
+        except Exception as e:
+            logger.warning(f"Failed to get alert {alert_id}: {e}")
+            return None
     
     def override_alert(self, alert_id: int, reason: str) -> bool:
         """Override alert with reason."""

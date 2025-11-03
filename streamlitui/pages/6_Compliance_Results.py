@@ -33,45 +33,43 @@ if not results:
                     st.rerun()
             except Exception as e:
                 st.error(f"Error running compliance check: {e}")
-    return
-
-# Display results
-try:
-    st.markdown(f"### Fund: {results.get('fund_name', 'N/A')}")
-    st.markdown(f"**Rules Checked:** {results.get('rules_checked', 0)}")
-    st.markdown(f"**Alerts Found:** {results.get('alerts_count', 0)}")
-    st.markdown(f"**Status:** {'Alerted' if results.get('alerted', False) else 'Passed'}")
-    
-    if results.get('alerts'):
-        st.markdown("### Alerts")
-        alerts_data = []
-        for alert in results.get('alerts', []):
-            alerts_data.append({
-                'Rule': alert.get('rule_name', 'N/A'),
-                'Alert Message': alert.get('alert_message', 'N/A'),
-                'Calculated %': format_percentage(alert.get('calculated_percentage', 0)) if alert.get('calculated_percentage') is not None else 'N/A',
-                'Holdings Triggered': alert.get('holdings_triggered', 'N/A')
-            })
+else:
+    # Display results
+    try:
+        st.markdown(f"### Fund: {results.get('fund_name', 'N/A')}")
+        st.markdown(f"**Rules Checked:** {results.get('rules_checked', 0)}")
+        st.markdown(f"**Alerts Found:** {results.get('alerts_count', 0)}")
+        st.markdown(f"**Status:** {'Alerted' if results.get('alerted', False) else 'Passed'}")
         
-        st.dataframe(alerts_data, use_container_width = True, hide_index = True)
-    else:
-        st.success("No compliance alerts found. All rules passed.")
+        if results.get('alerts'):
+            st.markdown("### Alerts")
+            alerts_data = []
+            for alert in results.get('alerts', []):
+                alerts_data.append({
+                    'Rule': alert.get('rule_name', 'N/A'),
+                    'Alert Message': alert.get('alert_message', 'N/A'),
+                    'Calculated %': format_percentage(alert.get('calculated_percentage', 0)) if alert.get('calculated_percentage') is not None else 'N/A',
+                    'Holdings Triggered': alert.get('holdings_triggered', 'N/A')
+                })
+            
+            st.dataframe(alerts_data, use_container_width = True, hide_index = True)
+        else:
+            st.success("No compliance alerts found. All rules passed.")
+        
+        st.markdown("---")
+        
+        # Action buttons
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("Run Another Check"):
+                clear_compliance_results()
+                st.rerun()
+        
+        with col2:
+            if st.button("Back to Funds"):
+                clear_compliance_results()
+                st.switch_page("pages/2_Funds.py")
     
-    st.markdown("---")
-    
-    # Action buttons
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        if st.button("Run Another Check"):
-            clear_compliance_results()
-            st.rerun()
-    
-    with col2:
-        if st.button("Back to Funds"):
-            clear_compliance_results()
-            st.switch_page("pages/2_Funds.py")
-
-except Exception as e:
-    st.error(f"Error displaying compliance results: {e}")
-
+    except Exception as e:
+        st.error(f"Error displaying compliance results: {e}")
