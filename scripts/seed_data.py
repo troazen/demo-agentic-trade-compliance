@@ -562,6 +562,127 @@ def create_sample_funds():
     return funds
 
 
+def create_holdings_from_account_positions(json_data: Dict[str, Any], funds: List[Fund], 
+                                           securities: List[Security]) -> None:
+    """
+    Create holdings from account_positions table in JSON data.
+    
+    Args:
+        json_data: Parsed JSON data
+        funds: List of created fund objects
+        securities: List of created security objects
+    """
+    logger.info("Creating holdings from account_positions data")
+    
+    positions_table = extract_table_data(json_data, 'account_positions')
+    if not positions_table or 'rows' not in positions_table:
+        logger.warning("No account_positions table found in JSON, skipping holdings from positions")
+        return
+    
+    # Get column indices
+    columns = [col['name'] for col in positions_table['columns']]
+    security_col_idx = columns.index('Security')
+    account_no_col_idx = columns.index('Account_No')
+    quantity_col_idx = columns.index('Quantity')
+    position_col_idx = columns.index('Position')
+    
+    # Create ticker lookup for securities
+    ticker_lookup = {sec.ticker: sec for sec in securities}
+    
+    # Map Account_No to funds (assuming Account_No values map to funds by index)
+    # Get unique Account_No values and sort them
+    account_nos = sorted(set(row[account_no_col_idx] for row in positions_table['rows'] 
+                             if len(row) > account_no_col_idx))
+    account_to_fund = {}
+    
+    # Map Account_No to funds by index (if we have matching counts)
+    if len(account_nos) <= len(funds):
+        for idx, account_no in enumerate(account_nos):
+            if idx < len(funds):
+                account_to_fund[account_no] = funds[idx]
+                logger.debug(f"Mapped Account_No {account_no} to fund {funds[idx].fund_name}")
+    else:
+        logger.warning(f"More Account_No values ({len(account_nos)}) than funds ({len(funds)}), mapping first {len(funds)}")
+        for idx in range(len(funds)):
+            account_to_fund[account_nos[idx]] = funds[idx]
+    
+    holdings_created = 0
+    holdings_skipped = 0
+    
+    # Process each position
+    for row in positions_table['rows']:
+        if len(row) <= max(security_col_idx, account_no_col_idx, quantity_col_idx, position_col_idx):
+            continue
+        
+        # Extract ticker from Security field (format: "TICKER - Name")
+        security_field = row[security_col_idx]
+        if ' - ' not in security_field:
+            logger.debug(f"Skipping position with invalid Security format: {security_field}")
+            holdings_skipped += 1
+            continue
+        
+        ticker = security_field.split(' - ')[0].strip()
+        
+        # Only process Long positions (Short positions not supported per PRD)
+        position = row[position_col_idx] if len(row) > position_col_idx else 'Long'
+        if position != 'Long':
+            logger.debug(f"Skipping {position} position for {ticker}")
+            holdings_skipped += 1
+            continue
+        
+        # Check if security exists
+        if ticker not in ticker_lookup:
+            logger.debug(f"Security {ticker} not found in securities, skipping")
+            holdings_skipped += 1
+            continue
+        
+        # Get fund for this Account_No
+        account_no = row[account_no_col_idx]
+        if account_no not in account_to_fund:
+            logger.debug(f"Account_No {account_no} not mapped to any fund, skipping")
+            holdings_skipped += 1
+            continue
+        
+        fund = account_to_fund[account_no]
+        quantity = row[quantity_col_idx]
+        
+        # Convert quantity to integer (no fractional shares per PRD)
+        try:
+            shares = int(float(quantity))
+            if shares <= 0:
+                logger.debug(f"Invalid shares quantity {shares} for {ticker}, skipping")
+                holdings_skipped += 1
+                continue
+        except (ValueError, TypeError):
+            logger.debug(f"Invalid quantity value {quantity} for {ticker}, skipping")
+            holdings_skipped += 1
+            continue
+        
+        # Check if holding already exists for this fund/ticker combination
+        existing_holding = Holding.query.filter_by(
+            fund_id = fund.fund_id,
+            ticker = ticker
+        ).first()
+        
+        if existing_holding:
+            # Update existing holding by adding shares
+            existing_holding.shares += Decimal(str(shares))
+            logger.debug(f"Updated existing holding: {fund.fund_name} - {ticker} (+{shares} shares)")
+        else:
+            # Create new holding
+            holding = Holding(
+                fund_id = fund.fund_id,
+                ticker = ticker,
+                shares = Decimal(str(shares))
+            )
+            db.session.add(holding)
+            logger.debug(f"Created holding: {fund.fund_name} - {ticker} ({shares} shares)")
+            holdings_created += 1
+    
+    db.session.commit()
+    logger.info(f"Created {holdings_created} holdings from account_positions, skipped {holdings_skipped} positions")
+
+
 def create_sample_holdings(funds, securities):
     """Create sample holdings for funds."""
     logger.info("Creating sample holdings")
@@ -740,6 +861,11 @@ def main():
         # Create sample data for remaining tables
         funds = create_sample_funds()
         create_sample_holdings(funds, securities)
+        
+        # If JSON data is available, try to create additional holdings from account_positions
+        if json_data:
+            create_holdings_from_account_positions(json_data, funds, securities)
+        
         rules = create_sample_rules()
         create_sample_rule_attachments(funds, rules)
         
