@@ -7,7 +7,7 @@ from flask_restx import Namespace, Resource
 import logging
 
 from app.services.rule_service import RuleService
-from app.api.models import rules_list_response, success_response
+from app.api.models import rules_list_response, success_response, rule_response
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,20 @@ class RulesList(Resource):
             result = []
             for rule in rules:
                 rule_data = rule.to_dict()
+                
+                # Add attached funds (only active attachments)
+                from sqlalchemy.orm import joinedload
+                from app.models import RuleAttachment
+                attachments = RuleAttachment.query.options(joinedload(RuleAttachment.fund)).filter_by(rule_id = rule.rule_id).all()
+                attached_funds = []
+                for att in attachments:
+                    if att.active and att.fund:
+                        attached_funds.append({
+                            'fund_id': att.fund_id,
+                            'fund_name': att.fund.fund_name
+                        })
+                rule_data['attached_funds'] = attached_funds
+                
                 result.append(rule_data)
             
             return {
@@ -49,7 +63,6 @@ class RulesList(Resource):
             }, 500
     
     @rules_ns.doc('create_rule')
-    @rules_ns.marshal_with(success_response)
     def post(self):
         """Create a new compliance rule."""
         logger.debug("API: Creating new rule")
@@ -71,7 +84,7 @@ class RulesList(Resource):
                         'error': f'{field} is required'
                     }, 400
             
-            rule = RuleService.create_rule(
+            result = RuleService.create_rule(
                 rule_name = data['rule_name'],
                 alert_message = data['alert_message'],
                 denominator = data['denominator'],
@@ -82,10 +95,19 @@ class RulesList(Resource):
                 portfolio_compliance_mode = data.get('portfolio_compliance_mode', True)
             )
             
+            if not result.get('success', False):
+                error_msg = result.get('error', 'Failed to create rule')
+                logger.error(f"Rule creation failed: {error_msg}")
+                return {
+                    'success': False,
+                    'error': error_msg
+                }, 400
+            
+            rule = result.get('rule')
             if not rule:
                 return {
                     'success': False,
-                    'error': 'Failed to create rule'
+                    'error': 'Failed to create rule - no rule object returned'
                 }, 500
             
             rule_data = rule.to_dict()
@@ -106,7 +128,7 @@ class RulesList(Resource):
 @rules_ns.route('/<int:rule_id>')
 class RuleDetail(Resource):
     @rules_ns.doc('get_rule')
-    @rules_ns.marshal_with(success_response)
+    @rules_ns.marshal_with(rule_response)
     def get(self, rule_id):
         """Get rule details by ID including fund attachments."""
         logger.debug(f"API: Getting rule {rule_id}")
@@ -358,7 +380,6 @@ class RuleDetach(Resource):
 @rules_ns.route('/validate-logic')
 class RuleValidateLogic(Resource):
     @rules_ns.doc('validate_rule_logic')
-    @rules_ns.marshal_with(success_response)
     def post(self):
         """Validate rule SQL logic."""
         logger.debug("API: Validating rule logic")
@@ -368,21 +389,75 @@ class RuleValidateLogic(Resource):
             if not data or 'logic' not in data:
                 return {
                     'success': False,
+                    'valid': False,
                     'error': 'logic field is required'
                 }, 400
             
             logic = data['logic']
             validation = RuleService.validate_rule_logic(logic)
             
+            # Return full validation result without marshalling to preserve error field
             return {
-                'success': validation['valid'],
-                'valid': validation['valid'],
+                'success': validation.get('valid', False),
+                'valid': validation.get('valid', False),
                 'error': validation.get('error')
             }
         except Exception as e:
-            logger.error(f"Failed to validate logic: {e}")
+            logger.error(f"Failed to validate logic: {e}", exc_info = True)
             return {
                 'success': False,
+                'valid': False,
+                'error': str(e)
+            }, 500
+
+
+@rules_ns.route('/check-name')
+class RuleCheckName(Resource):
+    @rules_ns.doc('check_rule_name')
+    def post(self):
+        """Check if a rule name is available."""
+        logger.debug("API: Checking rule name availability")
+        
+        try:
+            data = request.get_json()
+            if not data or 'rule_name' not in data:
+                return {
+                    'success': False,
+                    'available': False,
+                    'error': 'rule_name field is required'
+                }, 400
+            
+            rule_name = data.get('rule_name', '').strip()
+            exclude_rule_id = data.get('exclude_rule_id')  # For edit mode - exclude current rule
+            
+            if not rule_name:
+                return {
+                    'success': True,
+                    'available': False,
+                    'message': 'Rule name cannot be empty'
+                }
+            
+            # Check if rule name exists
+            existing_rule = RuleService.get_rule_by_name(rule_name)
+            
+            if existing_rule and (not exclude_rule_id or existing_rule.rule_id != exclude_rule_id):
+                return {
+                    'success': True,
+                    'available': False,
+                    'message': f"Rule name already exists as rule {existing_rule.rule_id}",
+                    'existing_rule_id': existing_rule.rule_id
+                }
+            
+            return {
+                'success': True,
+                'available': True,
+                'message': 'Rule name is available'
+            }
+        except Exception as e:
+            logger.error(f"Failed to check rule name: {e}")
+            return {
+                'success': False,
+                'available': False,
                 'error': str(e)
             }, 500
 

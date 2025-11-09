@@ -53,8 +53,11 @@ class APIClient:
             
             # Handle HTTP errors
             if response.status_code >= 400:
-                error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
-                error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                try:
+                    error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}
+                    error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                except:
+                    error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
                 logger.error(f"API error {response.status_code}: {error_msg}")
                 raise Exception(error_msg)
             
@@ -199,10 +202,13 @@ class APIClient:
         """Get rule details including attachments."""
         try:
             response = self._make_request('GET', f'/api/rules/{rule_id}')
+            logger.debug(f"API response for rule {rule_id}: {response}")
             rule = response.get('rule')
+            if not rule:
+                logger.warning(f"No rule data in response for rule {rule_id}. Response: {response}")
             return rule if rule else None
         except Exception as e:
-            logger.warning(f"Failed to get rule {rule_id}: {e}")
+            logger.error(f"Failed to get rule {rule_id}: {e}", exc_info = True)
             return None
     
     def create_rule(
@@ -306,6 +312,19 @@ class APIClient:
             'POST',
             '/api/rules/validate-logic',
             json_data = {'logic': logic}
+        )
+        return response
+    
+    def check_rule_name(self, rule_name: str, exclude_rule_id: Optional[int] = None) -> Dict[str, Any]:
+        """Check if a rule name is available."""
+        data = {'rule_name': rule_name}
+        if exclude_rule_id:
+            data['exclude_rule_id'] = exclude_rule_id
+        
+        response = self._make_request(
+            'POST',
+            '/api/rules/check-name',
+            json_data = data
         )
         return response
     

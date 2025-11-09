@@ -749,7 +749,7 @@ def create_sample_rules():
             'alert_message': 'US Regulations prohibit transacting in securities based in OFAC restricted countries.',
             'trade_compliance_mode': True,
             'portfolio_compliance_mode': True,
-            'logic': "issuer.country_incorporation IN ('PRK', 'MMR', 'TKM')",
+            'logic': "issuers.country_incorporation_code IN ('PRK', 'MMR', 'TKM')",
             'denominator': DenominatorType.PROHIBIT,
             'alert_if': None,
             'alert_level': None

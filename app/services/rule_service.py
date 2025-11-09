@@ -5,7 +5,7 @@ Rule service for managing compliance rules and fund attachments.
 from typing import List, Optional, Dict, Any
 import logging
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import or_, func
 
 from app.models import db, Rule, RuleAttachment, Fund
@@ -73,9 +73,30 @@ class RuleService:
         return rule
     
     @staticmethod
+    def get_rule_by_name(rule_name: str) -> Optional[Rule]:
+        """
+        Get rule by name.
+        
+        Args:
+            rule_name: Rule name to retrieve
+            
+        Returns:
+            Rule object or None if not found
+        """
+        logger.debug(f"Retrieving rule by name: {rule_name}")
+        
+        rule = Rule.query.filter_by(rule_name = rule_name).first()
+        if rule:
+            logger.debug(f"Found rule: {rule.rule_id} - {rule.rule_name}")
+        else:
+            logger.debug(f"Rule name '{rule_name}' not found")
+        
+        return rule
+    
+    @staticmethod
     def validate_rule_logic(logic: Optional[str]) -> Dict[str, Any]:
         """
-        Validate rule SQL logic for safety.
+        Validate rule SQL logic for safety and test against database.
         
         Args:
             logic: SQL logic string to validate
@@ -89,7 +110,8 @@ class RuleService:
             logger.debug("Logic is empty, will use default")
             return {'valid': True}
         
-        logic_str = logic.upper()
+        logic_str = logic.strip()
+        logic_upper = logic_str.upper()
         
         # Check for semicolons
         if ';' in logic_str:
@@ -98,19 +120,71 @@ class RuleService:
         
         # Check for blocked keywords
         for keyword in BLOCKED_SQL_KEYWORDS:
-            if f' {keyword} ' in f' {logic_str} ':
+            if f' {keyword} ' in f' {logic_upper} ':
                 logger.error(f"Logic contains blocked keyword: {keyword}")
                 return {'valid': False, 'error': f'SQL logic cannot contain "{keyword}" keyword'}
         
-        logger.debug("Rule logic validation passed")
-        return {'valid': True}
+        # Remove WHERE prefix if present
+        if logic_upper.startswith('WHERE'):
+            logic_str = logic_str[5:].strip()
+            logger.debug("Removed WHERE prefix from logic")
+        
+        # Test the SQL against the database using a sample query structure
+        # This matches the structure used in the compliance engine
+        try:
+            from sqlalchemy import text
+            
+            # Process logic to replace table names with aliases (as done in compliance engine)
+            processed_logic = logic_str.replace('holdings.', 'h.').replace('issuers.', 'i.').replace('issuer.', 'i.').replace('securities.', 's.')
+            
+            # Create a test query that matches the compliance engine structure
+            # Use a fund_id that might not exist (999999) to avoid affecting real data
+            test_query = text(f"""
+                SELECT COUNT(*) as test_count
+                FROM holdings h
+                INNER JOIN securities s ON h.ticker = s.ticker
+                INNER JOIN issuers i ON s.issr_id = i.issr_id
+                WHERE h.fund_id = 999999 AND ({processed_logic})
+                LIMIT 1
+            """)
+            
+            # Execute the test query
+            result = db.session.execute(test_query)
+            result.fetchone()  # Execute the query to check for SQL errors
+            
+            logger.debug("Rule logic validation passed - SQL syntax is valid")
+            return {'valid': True}
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"Rule logic validation failed: {error_msg}", exc_info = True)
+            
+            # Extract meaningful error message from SQLAlchemy exceptions
+            if hasattr(e, 'orig'):
+                # SQLAlchemy wraps the original exception
+                original_error = str(e.orig) if e.orig else error_msg
+                error_msg = original_error
+            
+            # Extract meaningful error message
+            if "no such column" in error_msg.lower() or "no such table" in error_msg.lower():
+                # SQLite error format
+                return {'valid': False, 'error': f'SQL error: {error_msg}'}
+            elif "column" in error_msg.lower() and "does not exist" in error_msg.lower():
+                # PostgreSQL error format
+                return {'valid': False, 'error': f'SQL error: {error_msg}'}
+            elif "operationalerror" in error_msg.lower() or "programmingerror" in error_msg.lower():
+                # SQLAlchemy operational/programming errors
+                return {'valid': False, 'error': f'SQL error: {error_msg}'}
+            else:
+                # Generic error - include full error message
+                return {'valid': False, 'error': f'SQL validation failed: {error_msg}'}
     
     @staticmethod
     def create_rule(rule_name: str, alert_message: str, denominator: str, 
                    logic: Optional[str] = None, alert_if: Optional[str] = None,
                    alert_level: Optional[float] = None, 
                    trade_compliance_mode: bool = True, 
-                   portfolio_compliance_mode: bool = True) -> Optional[Rule]:
+                   portfolio_compliance_mode: bool = True) -> Dict[str, Any]:
         """
         Create a new compliance rule.
         
@@ -125,28 +199,31 @@ class RuleService:
             portfolio_compliance_mode: Whether rule runs on portfolio
             
         Returns:
-            Created Rule object or None if creation failed
+            Dictionary with 'success' boolean, 'rule' object if successful, and 'error' message if failed
         """
         logger.debug(f"Creating new rule: {rule_name}")
         
         # Validate rule name is unique
         existing_rule = Rule.query.filter_by(rule_name = rule_name).first()
         if existing_rule:
-            logger.error(f"Rule name '{rule_name}' already exists")
-            return None
+            error_msg = f"Rule name '{rule_name}' already exists as rule {existing_rule.rule_id}"
+            logger.error(error_msg)
+            return {'success': False, 'rule': None, 'error': error_msg}
         
         # Validate logic
         logic_validation = RuleService.validate_rule_logic(logic)
         if not logic_validation['valid']:
-            logger.error(f"Rule logic validation failed: {logic_validation['error']}")
-            return None
+            error_msg = f"Rule logic validation failed: {logic_validation.get('error', 'Unknown error')}"
+            logger.error(error_msg)
+            return {'success': False, 'rule': None, 'error': error_msg}
         
         # Validate denominator
         try:
             denominator_enum = DenominatorType(denominator)
         except ValueError:
-            logger.error(f"Invalid denominator type: {denominator}")
-            return None
+            error_msg = f"Invalid denominator type: {denominator}"
+            logger.error(error_msg)
+            return {'success': False, 'rule': None, 'error': error_msg}
         
         # Validate alert_if
         alert_if_enum = None
@@ -154,13 +231,15 @@ class RuleService:
             try:
                 alert_if_enum = AlertIf(alert_if)
             except ValueError:
-                logger.error(f"Invalid alert_if value: {alert_if}")
-                return None
+                error_msg = f"Invalid alert_if value: {alert_if}"
+                logger.error(error_msg)
+                return {'success': False, 'rule': None, 'error': error_msg}
         
         # Validate alert_level (should not be None for non-prohibit rules)
         if denominator_enum != DenominatorType.PROHIBIT and alert_level is None:
-            logger.error("Alert level is required for non-prohibit rules")
-            return None
+            error_msg = "Alert level is required for non-prohibit rules"
+            logger.error(error_msg)
+            return {'success': False, 'rule': None, 'error': error_msg}
         
         try:
             rule = Rule(
@@ -179,12 +258,13 @@ class RuleService:
             db.session.commit()
             
             logger.info(f"Created rule {rule.rule_id}: {rule_name}")
-            return rule
+            return {'success': True, 'rule': rule, 'error': None}
             
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Failed to create rule: {e}")
-            return None
+            error_msg = f"Database error: {str(e)}"
+            logger.error(f"Failed to create rule: {error_msg}", exc_info = True)
+            return {'success': False, 'rule': None, 'error': error_msg}
     
     @staticmethod
     def update_rule(rule_id: int, rule_name: Optional[str] = None,
@@ -444,7 +524,7 @@ class RuleService:
         """
         logger.debug(f"Getting attachments for rule {rule_id}")
         
-        attachments = RuleAttachment.query.filter_by(rule_id = rule_id).all()
+        attachments = RuleAttachment.query.options(joinedload(RuleAttachment.fund)).filter_by(rule_id = rule_id).all()
         logger.debug(f"Found {len(attachments)} attachments for rule {rule_id}")
         return attachments
     
@@ -467,11 +547,18 @@ class RuleService:
         
         rule_data = rule.to_dict()
         
-        # Add attachments
+        # Add attached funds (only active attachments)
         attachments = RuleService.get_rule_attachments(rule_id)
-        rule_data['attachments'] = [att.to_dict() for att in attachments]
+        attached_funds = []
+        for att in attachments:
+            if att.active and att.fund:
+                attached_funds.append({
+                    'fund_id': att.fund_id,
+                    'fund_name': att.fund.fund_name
+                })
+        rule_data['attached_funds'] = attached_funds
         
-        logger.debug(f"Retrieved rule {rule_id} with {len(attachments)} attachments")
+        logger.debug(f"Retrieved rule {rule_id} with {len(attached_funds)} attached funds")
         return rule_data
     
     @staticmethod
