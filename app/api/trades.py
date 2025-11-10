@@ -101,13 +101,56 @@ class TradesList(Resource):
             if not result['success']:
                 return result, 400
             
-            # Return trade details
+            # Run compliance checks automatically
+            from app.services.compliance.trade_compliance import TradeComplianceService
+            compliance_result = TradeComplianceService.check_trade_compliance(trade)
+            
+            if not compliance_result.get('success'):
+                logger.error(f"Compliance check failed for trade {trade.trade_id}: {compliance_result.get('error')}")
+                # Still return trade details, but with error message
+                trade_data = trade.to_dict()
+                return {
+                    'success': False,
+                    'trade': trade_data,
+                    'error': compliance_result.get('error', 'Compliance check failed')
+                }, 500
+            
+            # Refresh trade to get updated status
+            from app.models import Trade, db
+            db.session.refresh(trade)
+            
+            # If alerts were found, return 403 status per PRD
+            if compliance_result.get('alerted', False):
+                trade_data = trade.to_dict()
+                return {
+                    'success': True,
+                    'trade': trade_data,
+                    'alerts': compliance_result.get('alerts', []),
+                    'message': 'Trade submitted but compliance alerts found'
+                }, 403
+            
+            # No alerts - automatically execute the trade per PRD Step 12
+            from app.services.trade_executor import TradeExecutor
+            execution_result = TradeExecutor.execute_trade(trade)
+            
+            if not execution_result.get('success'):
+                logger.error(f"Failed to execute trade {trade.trade_id}: {execution_result.get('error')}")
+                trade_data = trade.to_dict()
+                return {
+                    'success': False,
+                    'trade': trade_data,
+                    'error': execution_result.get('error', 'Failed to execute trade')
+                }, 500
+            
+            # Refresh trade to get final status
+            db.session.refresh(trade)
             trade_data = trade.to_dict()
             
+            # Trade processed successfully
             return {
                 'success': True,
                 'trade': trade_data,
-                'message': 'Trade submitted successfully'
+                'message': 'Trade submitted and executed successfully'
             }, 201
         except Exception as e:
             logger.error(f"Failed to create trade: {e}")
@@ -178,9 +221,26 @@ class TradeOverride(Resource):
                     override_reason = override_data[alert_id].get('reason', 'User override')
                     AlertService.override_alert(alert_id, override_reason)
             
-            # Update trade status to processed
-            TradeService.update_trade_status(trade_id, 'processed')
+            # Get the trade object
+            trade = TradeService.get_trade_by_id(trade_id)
+            if not trade:
+                return {
+                    'success': False,
+                    'error': 'Trade not found'
+                }, 404
             
+            # Execute the trade after overriding alerts (per PRD Step 12)
+            from app.services.trade_executor import TradeExecutor
+            execution_result = TradeExecutor.execute_trade(trade)
+            
+            if not execution_result.get('success'):
+                logger.error(f"Failed to execute trade {trade_id} after override: {execution_result.get('error')}")
+                return {
+                    'success': False,
+                    'error': execution_result.get('error', 'Failed to execute trade')
+                }, 500
+            
+            # Trade executed successfully
             return {
                 'success': True,
                 'message': 'Trade alerts overridden and trade processed'

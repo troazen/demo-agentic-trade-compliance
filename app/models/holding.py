@@ -56,6 +56,7 @@ class Holding(db.Model):
         """Convert holding to dictionary representation."""
         current_price = self.security.get_latest_price() if self.security else None
         market_value = current_price * self.shares if current_price else None
+        security_name = self.security.name if self.security else None
         
         return {
             'holding_id': self.holding_id,
@@ -64,7 +65,8 @@ class Holding(db.Model):
             'shares': int(self.shares),
             'current_price': float(current_price) if current_price else None,
             'market_value': float(market_value) if market_value else None,
-            'security_name': self.security.name if self.security else None,
+            'name': security_name,  # Alias for UI compatibility
+            'security_name': security_name,  # Keep for backward compatibility
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

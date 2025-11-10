@@ -52,6 +52,15 @@ class APIClient:
             )
             
             # Handle HTTP errors
+            # Special case: 403 means trade created but has compliance alerts (per PRD)
+            if response.status_code == 403:
+                try:
+                    return response.json()
+                except:
+                    error_msg = f"HTTP {response.status_code}: {response.text[:200]}"
+                    logger.warning(f"API 403 response but could not parse JSON: {error_msg}")
+                    raise Exception(error_msg)
+            
             if response.status_code >= 400:
                 try:
                     error_data = response.json() if response.headers.get('content-type', '').startswith('application/json') else {}

@@ -31,7 +31,10 @@ class HoldingsService:
         """
         logger.debug(f"Retrieving holdings for fund {fund_id}")
         
-        holdings = Holding.query.filter_by(fund_id = fund_id).all()
+        from sqlalchemy.orm import joinedload
+        
+        # Eagerly load security relationship to ensure name is available
+        holdings = Holding.query.options(joinedload(Holding.security)).filter_by(fund_id = fund_id).all()
         logger.debug(f"Retrieved {len(holdings)} holdings for fund {fund_id}")
         return holdings
     
@@ -298,6 +301,28 @@ class HoldingsService:
         ).all()
         
         try:
+            # For SELL orders, check if we need to delete holdings that were fully sold
+            if trade.direction == TradeDirection.SELL:
+                # Find the actual holding for the traded ticker
+                actual_holding = Holding.query.filter_by(
+                    fund_id = fund_id,
+                    ticker = trade.ticker
+                ).first()
+                
+                if actual_holding:
+                    # Check if there's a staging holding for this ticker
+                    staging_holding_for_ticker = next(
+                        (sh for sh in staging_holdings if sh.ticker == trade.ticker),
+                        None
+                    )
+                    
+                    # If no staging holding exists, it means all shares were sold (staging was deleted)
+                    if not staging_holding_for_ticker:
+                        # Delete the actual holding since all shares were sold
+                        db.session.delete(actual_holding)
+                        logger.debug(f"Deleted holding {trade.ticker} (all shares sold)")
+            
+            # Process all staging holdings
             for staging_holding in staging_holdings:
                 ticker = staging_holding.ticker
                 shares = staging_holding.shares
@@ -309,18 +334,24 @@ class HoldingsService:
                 ).first()
                 
                 if existing_holding:
-                    # Update existing holding
-                    existing_holding.shares = shares
-                    logger.debug(f"Updated holding {ticker} to {shares} shares")
+                    # If shares is 0 or negative, delete the holding
+                    if shares <= 0:
+                        db.session.delete(existing_holding)
+                        logger.debug(f"Deleted holding {ticker} (shares would be {shares})")
+                    else:
+                        # Update existing holding
+                        existing_holding.shares = shares
+                        logger.debug(f"Updated holding {ticker} to {shares} shares")
                 else:
-                    # Create new holding
-                    new_holding = Holding(
-                        fund_id = fund_id,
-                        ticker = ticker,
-                        shares = shares
-                    )
-                    db.session.add(new_holding)
-                    logger.debug(f"Created new holding {ticker} with {shares} shares")
+                    # Only create new holding if shares > 0
+                    if shares > 0:
+                        new_holding = Holding(
+                            fund_id = fund_id,
+                            ticker = ticker,
+                            shares = shares
+                        )
+                        db.session.add(new_holding)
+                        logger.debug(f"Created new holding {ticker} with {shares} shares")
             
             # Clean up staging holdings
             HoldingStaging.query.filter_by(

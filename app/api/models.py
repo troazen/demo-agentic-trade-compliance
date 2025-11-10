@@ -27,6 +27,7 @@ fund_model = Model('Fund', {
     'fund_id': fields.Integer(required = True, description = 'Unique fund identifier'),
     'fund_name': fields.String(required = True, description = 'Name of the fund'),
     'cash': fields.Float(required = True, description = 'Cash amount in the fund'),
+    'holdings_count': fields.Integer(description = 'Number of holdings'),
     'created_at': fields.DateTime(description = 'Fund creation timestamp'),
     'updated_at': fields.DateTime(description = 'Last update timestamp')
 })

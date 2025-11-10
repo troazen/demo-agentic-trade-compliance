@@ -28,12 +28,17 @@ class FundService:
         """
         logger.debug("Retrieving all funds")
         
+        from app.models import Holding
+        
+        # Get funds with holdings count
         funds = Fund.query.all()
         result = []
         
         for fund in funds:
             fund_data = fund.to_dict()
-            fund_data['holdings_count'] = fund.get_holdings_count()
+            # Count holdings directly from database to ensure accuracy
+            holdings_count = Holding.query.filter_by(fund_id = fund.fund_id).count()
+            fund_data['holdings_count'] = holdings_count
             result.append(fund_data)
         
         logger.debug(f"Retrieved {len(result)} funds")
@@ -170,18 +175,23 @@ class FundService:
         """
         logger.debug(f"Retrieving holdings with market values for fund {fund_id}")
         
-        fund = Fund.query.get(fund_id)
-        if not fund:
-            logger.error(f"Fund {fund_id} not found")
+        from sqlalchemy.orm import joinedload
+        from app.models import Holding
+        
+        # Eagerly load security relationship to ensure name is available
+        holdings = Holding.query.options(joinedload(Holding.security)).filter_by(fund_id = fund_id).all()
+        
+        if not holdings:
+            logger.debug(f"No holdings found for fund {fund_id}")
             return []
         
-        holdings = []
-        for holding in fund.holdings:
+        result = []
+        for holding in holdings:
             holding_data = holding.to_dict()
-            holdings.append(holding_data)
+            result.append(holding_data)
         
-        logger.debug(f"Retrieved {len(holdings)} holdings for fund {fund_id}")
-        return holdings
+        logger.debug(f"Retrieved {len(result)} holdings for fund {fund_id}")
+        return result
     
     @staticmethod
     def create_fund(fund_name: str, initial_cash: Decimal = Decimal('0.00')) -> Optional[Fund]:
