@@ -17,7 +17,7 @@ from decimal import Decimal
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from app import create_app
-from app.models import db, Fund, Security, Issuer, Rule, Trade, Alert, Holding
+from app.models import db, Fund, Security, Issuer, Rule, RuleAttachment, Trade, Alert, Holding
 from app.services.security_service import SecurityService
 from app.services.trade_service import TradeService
 from app.services.rule_service import RuleService
@@ -234,11 +234,11 @@ def test_rules_endpoints():
             rule = Rule.query.first()
             if rule:
                 rule_data = RuleService.get_rule_with_attachments(rule.rule_id)
-                if rule_data and 'attachments' in rule_data:
+                if rule_data and 'attached_funds' in rule_data:
                     logger.info(f"✓ PASS: get_rule_with_attachments() returned attachment data")
                     tests_passed += 1
                 else:
-                    logger.error(f"✗ FAIL: get_rule_with_attachments() missing attachments")
+                    logger.error(f"✗ FAIL: get_rule_with_attachments() missing attached_funds key")
             else:
                 logger.error("✗ FAIL: No rules in database")
         except Exception as e:
@@ -262,24 +262,42 @@ def test_rules_crud_operations():
         # Test create_rule
         total_tests += 1
         try:
+            # Clean up any existing test rule first
+            test_rule_name = "TEST_RULE_TEMP_DELETE_ME_V2"
+            existing_test_rule = Rule.query.filter_by(rule_name = test_rule_name).first()
+            if existing_test_rule:
+                # Delete attachments first
+                RuleAttachment.query.filter_by(rule_id = existing_test_rule.rule_id).delete()
+                # Delete the rule
+                db.session.delete(existing_test_rule)
+                db.session.commit()
+                logger.debug(f"Cleaned up existing test rule {existing_test_rule.rule_id}")
+            
             # Use alias qualified column names for SQL logic
-            test_rule = RuleService.create_rule(
-                rule_name = "TEST_RULE_TEMP_DELETE_ME_V2",
+            test_rule_result = RuleService.create_rule(
+                rule_name = test_rule_name,
                 alert_message = "Test rule for validation",
                 denominator = "total_assets",
                 alert_if = "above",
                 alert_level = 10.0,
                 logic = "i.gics_sector = 'Information Technology'"
             )
-            if test_rule:
+            if test_rule_result and test_rule_result.get('success', False) and test_rule_result.get('rule'):
                 logger.info(f"✓ PASS: create_rule() succeeded")
                 tests_passed += 1
                 # Clean up - deactivate and delete
-                RuleService.deactivate_rule(test_rule.rule_id)
+                rule_id = test_rule_result['rule'].rule_id
+                RuleService.deactivate_rule(rule_id)
+                # Also delete the rule to prevent conflicts on next run
+                RuleAttachment.query.filter_by(rule_id = rule_id).delete()
+                db.session.delete(test_rule_result['rule'])
+                db.session.commit()
             else:
-                logger.error(f"✗ FAIL: create_rule() returned None")
+                error_msg = test_rule_result.get('error', 'Unknown error') if test_rule_result else 'Returned None'
+                logger.error(f"✗ FAIL: create_rule() failed: {error_msg}")
         except Exception as e:
             logger.error(f"✗ FAIL: create_rule() raised exception: {e}")
+            db.session.rollback()
         
         # Test attach_rule_to_fund
         total_tests += 1
