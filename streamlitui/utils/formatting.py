@@ -87,7 +87,9 @@ def format_datetime(dt_string: Optional[str]) -> str:
         
         # Format as "YYYY-MM-DD HH:MM AM/PM ET"
         date_str = dt.strftime('%Y-%m-%d')
-        time_str = dt.strftime('%-I:%M %p')
+        # Use %I (12-hour format) - remove leading zero manually for Windows compatibility
+        hour_12 = dt.strftime('%I').lstrip('0') or '12'
+        time_str = f"{hour_12}:{dt.strftime('%M %p')}"
         
         return f"{date_str} {time_str} ET"
     except (ValueError, TypeError) as e:

@@ -21,7 +21,7 @@ class SecurityService:
     @staticmethod
     def get_security_by_ticker(ticker: str) -> Optional[Security]:
         """
-        Get security by ticker.
+        Get security by ticker with eager loading of relationships.
         
         Args:
             ticker: Security ticker symbol
@@ -31,7 +31,12 @@ class SecurityService:
         """
         logger.debug(f"Retrieving security {ticker}")
         
-        security = Security.query.get(ticker)
+        from sqlalchemy.orm import joinedload
+        
+        security = Security.query.options(
+            joinedload(Security.issuer)
+        ).get(ticker)
+        
         if security:
             logger.debug(f"Found security: {security.name}")
         else:

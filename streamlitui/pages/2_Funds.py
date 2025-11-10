@@ -33,7 +33,7 @@ try:
                 'Created': format_datetime(fund.get('created_at'))
             })
         
-        st.dataframe(funds_data, use_container_width = True, hide_index = True)
+        st.dataframe(funds_data, width = 'stretch', hide_index = True)
         
         # Selected fund details
         st.markdown("---")
@@ -75,7 +75,7 @@ try:
                                 'Market Value': format_currency(holding.get('market_value', 0)) if isinstance(holding, dict) else format_currency(0)
                             })
                         
-                        st.dataframe(holdings_data, use_container_width = True, hide_index = True)
+                        st.dataframe(holdings_data, width = 'stretch', hide_index = True)
             
             except Exception as e:
                 st.error(f"Error loading fund details: {e}")

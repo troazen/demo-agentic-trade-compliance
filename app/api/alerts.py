@@ -7,7 +7,7 @@ from flask_restx import Namespace, Resource
 import logging
 
 from app.services.alert_service import AlertService
-from app.api.models import alerts_list_response, success_response
+from app.api.models import alerts_list_response, success_response, alert_response
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +59,7 @@ class AlertsList(Resource):
 @alerts_ns.route('/<int:alert_id>')
 class AlertDetail(Resource):
     @alerts_ns.doc('get_alert')
-    @alerts_ns.marshal_with(success_response)
+    @alerts_ns.marshal_with(alert_response)
     def get(self, alert_id):
         """Get alert details by ID."""
         logger.debug(f"API: Getting alert {alert_id}")

@@ -7,6 +7,7 @@ from flask_restx import Namespace, Resource
 import logging
 
 from app.services.rule_service import RuleService
+from app.services.schema_service import SchemaService
 from app.api.models import rules_list_response, success_response, rule_response
 
 logger = logging.getLogger(__name__)
@@ -458,6 +459,30 @@ class RuleCheckName(Resource):
             return {
                 'success': False,
                 'available': False,
+                'error': str(e)
+            }, 500
+
+
+@rules_ns.route('/schema')
+class RuleSchema(Resource):
+    @rules_ns.doc('get_database_schema')
+    def get(self):
+        """Get database schema information for rule writing."""
+        logger.debug("API: Getting database schema")
+        
+        try:
+            schema = SchemaService.get_database_schema()
+            schema_dataframe = SchemaService.get_schema_dataframe()
+            
+            return {
+                'success': True,
+                'schema': schema,
+                'schema_dataframe': schema_dataframe
+            }
+        except Exception as e:
+            logger.error(f"Failed to get database schema: {e}", exc_info = True)
+            return {
+                'success': False,
                 'error': str(e)
             }, 500
 

@@ -328,6 +328,11 @@ class APIClient:
         )
         return response
     
+    def get_database_schema(self) -> Dict[str, Any]:
+        """Get database schema information for rule writing."""
+        response = self._make_request('GET', '/api/rules/schema')
+        return response
+    
     def test_rule(
         self,
         rule_id: int,

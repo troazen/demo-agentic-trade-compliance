@@ -33,76 +33,43 @@ try:
         st.info("No securities found.")
     else:
         st.markdown("### Securities List")
-        st.markdown("*Click a 'View' button to see details below*")
+        st.markdown("*Select a security from the table below to view details*")
         
-        # Create a scrollable container using CSS
-        # Inject CSS that will make the container scrollable
-        st.markdown("""
-            <style>
-            .securities-table-wrapper {
-                max-height: 50vh;
-                overflow-y: auto;
-                overflow-x: hidden;
-                border: 1px solid rgba(250, 250, 250, 0.2);
-                border-radius: 0.5rem;
-                padding: 1rem;
-                margin: 1rem 0;
-            }
-            </style>
-        """, unsafe_allow_html = True)
+        # Prepare securities data for dataframe
+        securities_data = []
+        for security in securities:
+            securities_data.append({
+                'Ticker': security.get('ticker', 'N/A'),
+                'Name': security.get('name', 'N/A'),
+                'Issuer': security.get('issuer_name', 'N/A'),
+                'Type': security.get('type', 'N/A'),
+                'Price': format_currency(security.get('current_price', 0)),
+                'Shares': format_shares(security.get('shares_outstanding', 0)),
+                'Market Cap': format_currency(security.get('market_cap', 0))
+            })
         
-        # Start the scrollable wrapper
-        st.markdown('<div class="securities-table-wrapper">', unsafe_allow_html = True)
+        # Display securities in a scrollable dataframe
+        st.dataframe(
+            securities_data,
+            width = 'stretch',
+            height = 400,
+            hide_index = True
+        )
         
-        # Display header row
-        header_cols = st.columns([1, 3, 2, 1, 2, 2, 2, 1])
-        with header_cols[0]:
-            st.markdown("**Ticker**")
-        with header_cols[1]:
-            st.markdown("**Name**")
-        with header_cols[2]:
-            st.markdown("**Issuer**")
-        with header_cols[3]:
-            st.markdown("**Type**")
-        with header_cols[4]:
-            st.markdown("**Price**")
-        with header_cols[5]:
-            st.markdown("**Shares**")
-        with header_cols[6]:
-            st.markdown("**Market Cap**")
-        with header_cols[7]:
-            st.markdown("**Action**")
-        
+        # Security selection dropdown
         st.markdown("---")
+        security_options = {f"{s.get('ticker')} - {s.get('name', 'N/A')}": s.get('ticker') for s in securities}
+        selected_security_display = st.selectbox(
+            "Select a security to view details",
+            options = list(security_options.keys()),
+            index = 0 if security_options else None,
+            key = "security_selector"
+        )
         
-        # Display securities in rows with buttons
-        for idx, security in enumerate(securities):
-            ticker = security.get('ticker')
-            
-            # Create columns for the row
-            cols = st.columns([1, 3, 2, 1, 2, 2, 2, 1])
-            
-            with cols[0]:
-                st.write(f"**{ticker}**")
-            with cols[1]:
-                st.write(security.get('name', 'N/A'))
-            with cols[2]:
-                st.write(security.get('issuer_name', 'N/A'))
-            with cols[3]:
-                st.write(security.get('type', 'N/A'))
-            with cols[4]:
-                st.write(format_currency(security.get('current_price', 0)))
-            with cols[5]:
-                st.write(format_shares(security.get('shares_outstanding', 0)))
-            with cols[6]:
-                st.write(format_currency(security.get('market_cap', 0)))
-            with cols[7]:
-                if st.button("View", key = f"view_{ticker}_{idx}", use_container_width = True):
-                    st.session_state.selected_security_ticker = ticker
-                    st.rerun()
-        
-        # Close the scrollable wrapper
-        st.markdown('</div>', unsafe_allow_html = True)
+        if selected_security_display:
+            selected_ticker = security_options.get(selected_security_display)
+            if selected_ticker:
+                st.session_state.selected_security_ticker = selected_ticker
         
         # Clear selection button
         if st.session_state.selected_security_ticker:

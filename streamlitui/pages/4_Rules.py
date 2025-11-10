@@ -162,6 +162,36 @@ def _render_rule_form(rule_to_edit = None):
         st.markdown("### Rule Logic")
         st.markdown("Enter SQL WHERE clause logic (without the WHERE keyword). Leave empty to apply to all securities.")
         
+        # Schema viewer button
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            show_schema_button = st.form_submit_button("📋 Show Database Schema", use_container_width = True)
+        with col2:
+            validate_button = st.form_submit_button("🔍 Validate Logic", use_container_width = True)
+        
+        # Show schema if button clicked
+        if show_schema_button:
+            try:
+                schema_response = api_client.get_database_schema()
+                if schema_response and schema_response.get('success'):
+                    schema_dataframe = schema_response.get('schema_dataframe', [])
+                    if schema_dataframe:
+                        st.markdown("#### Database Schema")
+                        st.markdown("*Use this reference when writing SQL logic for rules*")
+                        st.dataframe(
+                            schema_dataframe,
+                            width = 'stretch',
+                            height = 400,
+                            hide_index = True
+                        )
+                    else:
+                        st.warning("No schema information available")
+                else:
+                    error_msg = schema_response.get('error', 'Failed to load schema') if schema_response else 'No response from server'
+                    st.error(f"Failed to load database schema: {error_msg}")
+            except Exception as e:
+                st.error(f"Error loading database schema: {e}")
+        
         current_logic = rule_to_edit.get('logic', '') if rule_to_edit else ''
         logic = st.text_area(
             "SQL Logic",
@@ -169,9 +199,6 @@ def _render_rule_form(rule_to_edit = None):
             height = 150,
             help = "SQL WHERE clause logic. Example: issuers.gics_sector = 'Information Technology'"
         )
-        
-        # Validate logic button (outside form to avoid form submission)
-        validate_button = st.form_submit_button("🔍 Validate Logic", use_container_width = False)
         if validate_button:
             if logic and logic.strip():
                 validation_result = api_client.validate_rule_logic(logic)
@@ -387,7 +414,7 @@ try:
                 'Created': format_datetime(rule.get('created_at'))
             })
         
-        st.dataframe(rules_data, use_container_width = True, hide_index = True)
+        st.dataframe(rules_data, width = 'stretch', hide_index = True)
         
         # Action buttons
         col1, col2, col3 = st.columns([1, 1, 1])

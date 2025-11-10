@@ -58,7 +58,7 @@ try:
                 'Created': format_datetime(alert.get('created_at'))
             })
         
-        st.dataframe(alerts_data, use_container_width = True, hide_index = True)
+        st.dataframe(alerts_data, width = 'stretch', hide_index = True)
         
         # Detailed view
         st.markdown("---")

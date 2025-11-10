@@ -8,7 +8,7 @@ import logging
 
 from app.services.security_service import SecurityService
 from app.api.models import (
-    securities_list_response, security_model,
+    securities_list_response, security_model, security_with_issuer,
     success_response, error_response
 )
 
@@ -103,7 +103,7 @@ class SecuritySearch(Resource):
 @securities_ns.route('/<string:ticker>')
 class SecurityDetail(Resource):
     @securities_ns.doc('get_security')
-    @securities_ns.marshal_with(success_response)
+    @securities_ns.marshal_with(security_with_issuer)
     def get(self, ticker):
         """Get security details by ticker."""
         logger.debug(f"API: Getting security {ticker}")

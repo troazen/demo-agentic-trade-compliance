@@ -61,7 +61,7 @@ try:
                     'Created': format_datetime(alert.get('created_at'))
                 })
             
-            st.dataframe(alerts_data, use_container_width = True, hide_index = True)
+            st.dataframe(alerts_data, width = 'stretch', hide_index = True)
         else:
             st.info("No recent alerts")
     except Exception as e:
@@ -87,7 +87,7 @@ try:
                     'Created': format_datetime(trade.get('created_at'))
                 })
             
-            st.dataframe(trades_data, use_container_width = True, hide_index = True)
+            st.dataframe(trades_data, width = 'stretch', hide_index = True)
         else:
             st.info("No recent trades")
     except Exception as e:

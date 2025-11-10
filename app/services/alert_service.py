@@ -65,7 +65,7 @@ class AlertService:
     @staticmethod
     def get_alert_by_id(alert_id: int) -> Optional[Alert]:
         """
-        Get alert by ID.
+        Get alert by ID with eager loading of relationships.
         
         Args:
             alert_id: Alert ID to retrieve
@@ -75,7 +75,14 @@ class AlertService:
         """
         logger.debug(f"Retrieving alert {alert_id}")
         
-        alert = Alert.query.get(alert_id)
+        from sqlalchemy.orm import joinedload
+        
+        alert = Alert.query.options(
+            joinedload(Alert.rule),
+            joinedload(Alert.fund),
+            joinedload(Alert.trade)
+        ).get(alert_id)
+        
         if alert:
             logger.debug(f"Found alert: {alert.rule.rule_name if alert.rule else 'Unknown rule'}")
         else:

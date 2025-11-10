@@ -259,13 +259,7 @@ fund_holdings_response = Model('FundHoldingsResponse', {
     'holdings_count': fields.Integer(description = 'Number of holdings')
 })
 
-compliance_check_response = Model('ComplianceCheckResponse', {
-    'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
-    'alerts': fields.List(fields.Raw, description = 'List of alerts'),
-    'alerts_count': fields.Integer(description = 'Number of alerts'),
-    'rules_checked': fields.Integer(description = 'Number of rules checked'),
-    'fund_id': fields.Integer(description = 'Fund ID')
-})
+# Compliance check response model (first definition - will be replaced)
 
 # Rule test models
 rule_test_request = Model('RuleTestRequest', {
@@ -292,6 +286,7 @@ rule_test_response = Model('RuleTestResponse', {
 compliance_check_response = Model('ComplianceCheckResponse', {
     'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
     'fund_id': fields.Integer(description = 'Fund ID'),
+    'fund_name': fields.String(description = 'Fund name'),
     'rules_checked': fields.Integer(description = 'Number of rules checked'),
     'alerts': fields.List(fields.Raw, description = 'List of alerts'),
     'alerts_count': fields.Integer(description = 'Number of alerts'),

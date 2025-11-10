@@ -12,7 +12,7 @@ from app.api.models import (
     funds_list_response, fund_response, fund_create_request, 
     fund_cash_update_request, total_assets_response, 
     net_assets_response, total_assets_ex_cash_response,
-    success_response, error_response
+    success_response, error_response, compliance_check_response
 )
 
 logger = logging.getLogger(__name__)
@@ -252,7 +252,7 @@ class FundCreate(Resource):
 @funds_ns.route('/<int:fund_id>/compliance-check')
 class FundComplianceCheck(Resource):
     @funds_ns.doc('run_portfolio_compliance_check')
-    @funds_ns.marshal_with(success_response)
+    @funds_ns.marshal_with(compliance_check_response)
     def post(self, fund_id):
         """Run portfolio compliance check for a fund."""
         logger.debug(f"API: Running portfolio compliance check for fund {fund_id}")
@@ -284,6 +284,7 @@ class FundComplianceCheck(Resource):
             return {
                 'success': True,
                 'fund_id': fund_id,
+                'fund_name': fund.fund_name,
                 'rules_checked': len(rules),
                 'alerts': result.get('alerts', []),
                 'alerts_count': len(result.get('alerts', [])),
