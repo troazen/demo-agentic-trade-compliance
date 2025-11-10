@@ -17,7 +17,7 @@ This application monitors compliance of trades placed in open-end 40 Act mutual 
 
 ## Tech Stack
 
-- **Backend**: Python 3.14 with Flask and SQLAlchemy
+- **Backend**: Python 3.13.0 with Flask and SQLAlchemy
 - **Frontend**: Streamlit for web interface
 - **Database**: SQLite for data persistence
 - **API**: RESTful endpoints for external integration
@@ -54,8 +54,10 @@ This application monitors compliance of trades placed in open-end 40 Act mutual 
 ## Getting Started
 
 ### Prerequisites
-- Python 3.13 (or later)
+- Python 3.13
 - Virtual environment (recommended)
+
+_Please note: as of initial development, there are some issues with the packages required for Streamlit on Python 3.14. While the tool should be compatible with 3.14 going foward, the author recommends using 3.13 temporarily._
 
 ### Installation
 1. Clone the repository
@@ -70,16 +72,23 @@ This application monitors compliance of trades placed in open-end 40 Act mutual 
 **Note**: This application requires running both backend and frontend separately.
 
 #### Backend (Flask API)
-```bash
-python run.py
+```powershell
+python .\run.py
 ```
 The Flask backend will start on `http://localhost:5000` with the REST API available at `http://localhost:5000/api`
 
 #### Frontend (Streamlit)
-```bash
-streamlit run [frontend_app.py]
+```powershell
+streamlit run .\streamlitui\app.py
 ```
-*Note: The Streamlit frontend application is not yet implemented. The backend API is ready for frontend integration.*
+You may need to use multiple terminal windows (or tabs) to run both services separatley in parallel. 
+In the event that you need to populate the database, this tool is set up to automatically re-hydrate the database with 
+```powershell
+python .\scripts\seed_data.py
+```
+**The seed_data script will drop any prior records and re-create the database using the included Investment_Data.json file.**
+
+_PowerShell command syntax shown from a terminal navigated to cwd of the project._
 
 ### API Testing
 You can test the API endpoints directly:
