@@ -9,7 +9,7 @@ import logging
 from app.services.trade_service import TradeService
 from app.api.models import (
     trade_response, trade_create_request,
-    success_response, error_response
+    success_response, error_response, trade_override_request
 )
 
 logger = logging.getLogger(__name__)
@@ -194,6 +194,7 @@ class TradeDetail(Resource):
 @trades_ns.route('/<int:trade_id>/override')
 class TradeOverride(Resource):
     @trades_ns.doc('override_trade')
+    @trades_ns.expect(trade_override_request)
     @trades_ns.marshal_with(success_response)
     def post(self, trade_id):
         """Override trade alerts and proceed with trade."""

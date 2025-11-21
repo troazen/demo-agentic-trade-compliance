@@ -147,25 +147,25 @@ rule_model = Model('Rule', {
 })
 
 rule_create_request = Model('RuleCreateRequest', {
-    'rule_name': fields.String(required = True, description = 'Name of the rule'),
-    'alert_message': fields.String(required = True, description = 'Alert message'),
-    'denominator': fields.String(required = True, description = 'Denominator type'),
-    'logic': fields.String(description = 'SQL logic (optional)'),
-    'alert_if': fields.String(description = 'Alert condition (above/below)'),
-    'alert_level': fields.Float(description = 'Alert threshold level'),
-    'trade_compliance_mode': fields.Boolean(description = 'Run on trades', default = True),
-    'portfolio_compliance_mode': fields.Boolean(description = 'Run on portfolio', default = True)
+    'rule_name': fields.String(required = True, description = 'Name of the compliance rule'),
+    'alert_message': fields.String(required = True, description = 'Alert message displayed when rule is violated'),
+    'denominator': fields.String(required = True, description = 'Denominator type: total_assets, net_assets, total_assets_ex_cash, shares_outstanding_fe, or prohibit'),
+    'logic': fields.String(description = 'SQL WHERE clause logic to filter holdings (optional, blank means all holdings)'),
+    'alert_if': fields.String(description = 'Alert condition: "above" or "below" (null for prohibit rules)'),
+    'alert_level': fields.Float(description = 'Alert threshold percentage (null for prohibit rules)'),
+    'trade_compliance_mode': fields.Boolean(description = 'Whether rule runs on trade compliance checks', default = True),
+    'portfolio_compliance_mode': fields.Boolean(description = 'Whether rule runs on portfolio compliance checks', default = True)
 })
 
 rule_update_request = Model('RuleUpdateRequest', {
-    'rule_name': fields.String(description = 'Name of the rule'),
-    'alert_message': fields.String(description = 'Alert message'),
-    'logic': fields.String(description = 'SQL logic'),
-    'denominator': fields.String(description = 'Denominator type'),
-    'alert_if': fields.String(description = 'Alert condition'),
-    'alert_level': fields.Float(description = 'Alert threshold level'),
-    'trade_compliance_mode': fields.Boolean(description = 'Run on trades'),
-    'portfolio_compliance_mode': fields.Boolean(description = 'Run on portfolio')
+    'rule_name': fields.String(description = 'Name of the compliance rule'),
+    'alert_message': fields.String(description = 'Alert message displayed when rule is violated'),
+    'logic': fields.String(description = 'SQL WHERE clause logic to filter holdings (blank means all holdings)'),
+    'denominator': fields.String(description = 'Denominator type: total_assets, net_assets, total_assets_ex_cash, shares_outstanding_fe, or prohibit'),
+    'alert_if': fields.String(description = 'Alert condition: "above" or "below" (null for prohibit rules)'),
+    'alert_level': fields.Float(description = 'Alert threshold percentage (null for prohibit rules)'),
+    'trade_compliance_mode': fields.Boolean(description = 'Whether rule runs on trade compliance checks'),
+    'portfolio_compliance_mode': fields.Boolean(description = 'Whether rule runs on portfolio compliance checks')
 })
 
 rule_attach_request = Model('RuleAttachRequest', {
@@ -268,6 +268,19 @@ rule_test_request = Model('RuleTestRequest', {
     'test_trade': fields.Raw(description = 'Optional test trade details {ticker, direction, shares}')
 })
 
+rule_validate_logic_request = Model('RuleValidateLogicRequest', {
+    'logic': fields.String(required = True, description = 'SQL logic to validate')
+})
+
+rule_check_name_request = Model('RuleCheckNameRequest', {
+    'rule_name': fields.String(required = True, description = 'Rule name to check'),
+    'exclude_rule_id': fields.Integer(description = 'Optional rule ID to exclude from check (for edit mode)')
+})
+
+trade_override_request = Model('TradeOverrideRequest', {
+    'alerts': fields.Raw(required = True, description = 'Dictionary mapping alert_id to override data {reason: string}')
+})
+
 rule_test_response = Model('RuleTestResponse', {
     'success': fields.Boolean(required = True, description = 'Indicates if the request was successful'),
     'rule_id': fields.Integer(description = 'Rule ID'),
@@ -301,3 +314,6 @@ api.models[fund_holdings_response.name] = fund_holdings_response
 api.models[compliance_check_response.name] = compliance_check_response
 api.models[rule_test_request.name] = rule_test_request
 api.models[rule_test_response.name] = rule_test_response
+api.models[rule_validate_logic_request.name] = rule_validate_logic_request
+api.models[rule_check_name_request.name] = rule_check_name_request
+api.models[trade_override_request.name] = trade_override_request
