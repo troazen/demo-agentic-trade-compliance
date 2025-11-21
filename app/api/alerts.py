@@ -7,7 +7,7 @@ from flask_restx import Namespace, Resource
 import logging
 
 from app.services.alert_service import AlertService
-from app.api.models import alerts_list_response, success_response, alert_response
+from app.api.models import alerts_list_response, success_response, alert_response, alert_override_request
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,7 @@ class AlertDetail(Resource):
 @alerts_ns.route('/<int:alert_id>/override')
 class AlertOverride(Resource):
     @alerts_ns.doc('override_alert')
+    @alerts_ns.expect(alert_override_request)
     @alerts_ns.marshal_with(success_response)
     def put(self, alert_id):
         """Override alert with reason."""

@@ -8,7 +8,11 @@ import logging
 
 from app.services.rule_service import RuleService
 from app.services.schema_service import SchemaService
-from app.api.models import rules_list_response, success_response, rule_response
+from app.api.models import (
+    rules_list_response, success_response, rule_response,
+    rule_create_request, rule_update_request, rule_attach_request,
+    rule_test_request, rule_validate_logic_request, rule_check_name_request
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +68,8 @@ class RulesList(Resource):
             }, 500
     
     @rules_ns.doc('create_rule')
+    @rules_ns.expect(rule_create_request)
+    @rules_ns.marshal_with(rule_response)
     def post(self):
         """Create a new compliance rule."""
         logger.debug("API: Creating new rule")
@@ -155,6 +161,7 @@ class RuleDetail(Resource):
             }, 500
     
     @rules_ns.doc('update_rule')
+    @rules_ns.expect(rule_update_request)
     @rules_ns.marshal_with(success_response)
     def put(self, rule_id):
         """Update an existing rule."""
@@ -285,6 +292,7 @@ class RuleDeactivate(Resource):
 @rules_ns.route('/<int:rule_id>/attach')
 class RuleAttach(Resource):
     @rules_ns.doc('attach_rule_to_fund')
+    @rules_ns.expect(rule_attach_request)
     @rules_ns.marshal_with(success_response)
     def post(self, rule_id):
         """Attach a rule to one or more funds."""
@@ -333,6 +341,7 @@ class RuleAttach(Resource):
 @rules_ns.route('/<int:rule_id>/detach')
 class RuleDetach(Resource):
     @rules_ns.doc('detach_rule_from_fund')
+    @rules_ns.expect(rule_attach_request)
     @rules_ns.marshal_with(success_response)
     def post(self, rule_id):
         """Detach a rule from one or more funds."""
@@ -381,6 +390,7 @@ class RuleDetach(Resource):
 @rules_ns.route('/validate-logic')
 class RuleValidateLogic(Resource):
     @rules_ns.doc('validate_rule_logic')
+    @rules_ns.expect(rule_validate_logic_request)
     def post(self):
         """Validate rule SQL logic."""
         logger.debug("API: Validating rule logic")
@@ -415,6 +425,7 @@ class RuleValidateLogic(Resource):
 @rules_ns.route('/check-name')
 class RuleCheckName(Resource):
     @rules_ns.doc('check_rule_name')
+    @rules_ns.expect(rule_check_name_request)
     def post(self):
         """Check if a rule name is available."""
         logger.debug("API: Checking rule name availability")
@@ -490,6 +501,7 @@ class RuleSchema(Resource):
 @rules_ns.route('/<int:rule_id>/test')
 class RuleTest(Resource):
     @rules_ns.doc('test_rule')
+    @rules_ns.expect(rule_test_request)
     @rules_ns.marshal_with(success_response)
     def post(self, rule_id):
         """Test a rule against a fund with optional simulated trade."""
