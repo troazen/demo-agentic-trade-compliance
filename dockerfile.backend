@@ -13,6 +13,7 @@ COPY ./Investment_Data.json ./Investment_Data.json
 
 RUN pip3 install -r requirements.txt --no-cache-dir
 
-EXPOSE 80
+EXPOSE 5000
 
-CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0", "--port=80"]
+CMD [ "python3", "run.py"]
+# CMD [ "python3", "-m" , "flask", "run", "--host=0.0.0.0", "--port=5000"]
