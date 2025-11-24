@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  flaskserver:
+    environment: 
+      - DEBUG=0
+      - FLASK_RUN_PORT=80
+    build:
+      context: .
+      dockerfile: dockerfile.backend
+    image: tradecompliancebackend
+    ports:
+        - 80:80
+  streamlitui:
+    build:
+      context: .
+      dockerfile: dockerfile.frontend
+    image: tradecompliancefrontend
+    ports:
+      - 8501:8501
+    # volumes:
+    #   - ./data:/flaskapp/data
+
+
+

@@ -1,0 +1,15 @@
+# syntax=docker/dockerfile:1
+
+FROM python:3.13-slim-bullseye
+
+WORKDIR /app
+
+# Copy Files
+COPY ./requirements.txt ./requirements.txt
+COPY ./streamlitui ./streamlitui
+
+RUN pip3 install -r requirements.txt
+
+EXPOSE 8501
+
+CMD [ "streamlit", "run", "streamlitui/app.py"]
