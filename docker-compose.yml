@@ -24,9 +24,12 @@ services:
       context: .
       dockerfile: dockerfile.frontend
     image: frontend_trade_compliance
+    environment:
+      - API_BASE_URL=http://backend_trade_compliance:5000
     ports:
       - 8501:8501
-      - 5000:5000
+    depends_on:
+      - backend_trade_compliance
     # volumes:
     #   - ./data:/flaskapp/data
 

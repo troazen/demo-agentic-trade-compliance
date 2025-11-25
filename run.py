@@ -13,7 +13,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
 from app import create_app
 from app.config import config
 
-# Set up logging
+# Set up logging - respect LOG_LEVEL environment variable
+log_level = os.environ.get('LOG_LEVEL', 'INFO').upper()
 logging.basicConfig(
     level = logging.DEBUG,
     format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -40,7 +41,8 @@ def main():
     # Get configuration
     host = os.environ.get('FLASK_HOST', '0.0.0.0')
     port = int(os.environ.get('FLASK_PORT', 5000))
-    debug = os.environ.get('FLASK_DEBUG', 'True').lower() == 'true'
+    # Check FLASK_DEBUG first, then fall back to DEBUG env var, then default to False for production
+    debug = os.environ.get('FLASK_DEBUG', os.environ.get('DEBUG', 'False')).lower() in ('true', '1', 'yes')
     
     logger.info(f"Starting server on {host}:{port} (debug={debug})")
     

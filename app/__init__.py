@@ -2,6 +2,7 @@
 Investment Operations Compliance System - Flask Application Factory
 """
 
+import os
 import logging
 from flask import Flask
 from flask_cors import CORS
@@ -10,12 +11,13 @@ from app.config import Config
 from app.models import db
 
 
-def create_app(config_class = Config) -> Flask:
+def create_app(config_class = Config, skip_auto_init = False) -> Flask:
     """
     Create and configure Flask application instance.
     
     Args:
         config_class: Configuration class to use
+        skip_auto_init: If True, skip automatic database initialization (prevents infinite loops)
         
     Returns:
         Configured Flask application instance
@@ -29,9 +31,10 @@ def create_app(config_class = Config) -> Flask:
     # Enable CORS for Streamlit frontend
     CORS(app)
     
-    # Configure logging
+    # Configure logging - respect LOG_LEVEL from config or environment
+    log_level = getattr(config_class, 'LOG_LEVEL', os.environ.get('LOG_LEVEL', 'INFO')).upper()
     logging.basicConfig(
-        level = logging.DEBUG,
+        level = getattr(logging, log_level, logging.INFO),
         format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         handlers = [
             logging.FileHandler('compliance_system.log'),
@@ -51,7 +54,7 @@ def create_app(config_class = Config) -> Flask:
         logger.info("Database tables created/verified")
         
         # Check if database should be auto-initialized
-        auto_init = getattr(config_class, 'AUTO_INITIALIZE_DB', False)
+        auto_init = getattr(config_class, 'AUTO_INITIALIZE_DB', False) and not skip_auto_init
         
         if auto_init:
             # Check if database is empty
@@ -65,11 +68,11 @@ def create_app(config_class = Config) -> Flask:
                 try:
                     # Import and run the seed script
                     import sys
-                    import os
                     sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
                     
                     from scripts.seed_data import main as seed_main
-                    seed_main()
+                    # Pass the current app instance to prevent infinite loop
+                    seed_main(app)
                     logger.info("Database auto-initialization completed successfully")
                 except Exception as e:
                     logger.error(f"Database auto-initialization failed: {e}")

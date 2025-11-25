@@ -814,8 +814,14 @@ def create_sample_rule_attachments(funds, rules):
     logger.info(f"Created {len(attachments)} rule attachments")
 
 
-def main():
-    """Main seeding function."""
+def main(app=None):
+    """
+    Main seeding function.
+    
+    Args:
+        app: Optional Flask app instance. If provided, uses this app instead of creating a new one.
+             This prevents infinite loops when called from create_app().
+    """
     import logging
     
     # Set up logging
@@ -827,50 +833,65 @@ def main():
     logger = logging.getLogger(__name__)
     logger.info("Starting data seeding process")
     
-    # Create Flask app
-    app = create_app()
+    # Use provided app or create a new one
+    if app is None:
+        # Skip auto-init to prevent infinite loop when creating app from seed script
+        app = create_app(skip_auto_init=True)
+        use_app_context = True
+    else:
+        # If app is provided, we're already in an app context from the caller
+        use_app_context = False
     
-    with app.app_context():
-        # Clear existing data
-        logger.info("Clearing existing data")
-        db.drop_all()
-        db.create_all()
-        
-        # Load JSON data
-        json_data = load_json_data()
-        
-        # Build lookups from JSON
-        gics_lookups = build_gics_lookup(json_data)
-        country_lookup = build_country_lookup(json_data)
-        
-        # Create issuers and securities from JSON
-        if json_data:
-            logger.info("Creating issuers and securities from JSON data")
-            issuers = create_issuers_from_json(json_data, gics_lookups, country_lookup)
-            securities = create_securities_from_json(json_data, issuers, gics_lookups, country_lookup)
-        else:
-            logger.info("JSON data not available, using sample data")
-            # Fall back to sample data if JSON is not available
-            issuers = create_sample_issuers()
-            securities = create_sample_securities(issuers)
-        
-        # Generate price data
-        if securities:
-            create_sample_prices(securities)
-        
-        # Create sample data for remaining tables
-        funds = create_sample_funds()
-        create_sample_holdings(funds, securities)
-        
-        # If JSON data is available, try to create additional holdings from account_positions
-        if json_data:
-            create_holdings_from_account_positions(json_data, funds, securities)
-        
-        rules = create_sample_rules()
-        create_sample_rule_attachments(funds, rules)
-        
-        logger.info("Data seeding completed successfully")
-        logger.info(f"Created: {len(issuers)} issuers, {len(securities)} securities, {len(funds)} funds, {len(rules)} rules")
+    if use_app_context:
+        with app.app_context():
+            _seed_database(logger)
+    else:
+        # We're already in an app context, just run the seeding
+        _seed_database(logger)
+
+
+def _seed_database(logger):
+    """Internal function to perform the actual database seeding."""
+    # Clear existing data
+    logger.info("Clearing existing data")
+    db.drop_all()
+    db.create_all()
+    
+    # Load JSON data
+    json_data = load_json_data()
+    
+    # Build lookups from JSON
+    gics_lookups = build_gics_lookup(json_data)
+    country_lookup = build_country_lookup(json_data)
+    
+    # Create issuers and securities from JSON
+    if json_data:
+        logger.info("Creating issuers and securities from JSON data")
+        issuers = create_issuers_from_json(json_data, gics_lookups, country_lookup)
+        securities = create_securities_from_json(json_data, issuers, gics_lookups, country_lookup)
+    else:
+        logger.info("JSON data not available, using sample data")
+        # Fall back to sample data if JSON is not available
+        issuers = create_sample_issuers()
+        securities = create_sample_securities(issuers)
+    
+    # Generate price data
+    if securities:
+        create_sample_prices(securities)
+    
+    # Create sample data for remaining tables
+    funds = create_sample_funds()
+    create_sample_holdings(funds, securities)
+    
+    # If JSON data is available, try to create additional holdings from account_positions
+    if json_data:
+        create_holdings_from_account_positions(json_data, funds, securities)
+    
+    rules = create_sample_rules()
+    create_sample_rule_attachments(funds, rules)
+    
+    logger.info("Data seeding completed successfully")
+    logger.info(f"Created: {len(issuers)} issuers, {len(securities)} securities, {len(funds)} funds, {len(rules)} rules")
 
 
 if __name__ == '__main__':
