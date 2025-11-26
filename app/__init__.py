@@ -57,11 +57,13 @@ def create_app(config_class = Config, skip_auto_init = False) -> Flask:
         auto_init = getattr(config_class, 'AUTO_INITIALIZE_DB', False) and not skip_auto_init
         
         if auto_init:
-            # Check if database is empty
-            from app.models import Fund
+            # Check if database is empty or missing critical data (rules)
+            from app.models import Fund, Rule
             
             fund_count = Fund.query.count()
+            rule_count = Rule.query.count()
             is_empty = fund_count == 0
+            missing_rules = fund_count > 0 and rule_count == 0
             
             if is_empty:
                 logger.info("Database appears to be empty, running automatic initialization...")
@@ -75,7 +77,24 @@ def create_app(config_class = Config, skip_auto_init = False) -> Flask:
                     seed_main(app)
                     logger.info("Database auto-initialization completed successfully")
                 except Exception as e:
-                    logger.error(f"Database auto-initialization failed: {e}")
+                    logger.error(f"Database auto-initialization failed: {e}", exc_info=True)
                     logger.error("Application will continue with empty database")
+            elif missing_rules:
+                logger.warning(f"Database has {fund_count} funds but {rule_count} rules. Rules may be missing.")
+                logger.info("Attempting to add missing rules without dropping existing data...")
+                try:
+                    # Import and run just the rules creation
+                    import sys
+                    sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+                    
+                    from scripts.seed_data import ensure_sample_rules_exist
+                    rules = ensure_sample_rules_exist()
+                    if rules:
+                        logger.info(f"Successfully added {len(rules)} sample rules")
+                    else:
+                        logger.warning("No rules were added. Check logs for errors.")
+                except Exception as e:
+                    logger.error(f"Failed to add missing rules: {e}", exc_info=True)
+                    logger.warning("Consider running seed_data.py manually to populate rules: python scripts/seed_data.py")
     
     return app

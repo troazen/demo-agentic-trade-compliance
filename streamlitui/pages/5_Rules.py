@@ -379,6 +379,13 @@ try:
     # Get all rules
     all_rules = api_client.get_rules(search_query = rule_search if rule_search else None)
     
+    # Ensure all_rules is a list (handle None or other unexpected types)
+    if all_rules is None:
+        all_rules = []
+    if not isinstance(all_rules, list):
+        logger.warning(f"Expected list from get_rules(), got {type(all_rules)}: {all_rules}")
+        all_rules = []
+    
     # Filter by fund
     filtered_rules = []
     if fund_filter:
@@ -395,8 +402,34 @@ try:
         else:
             filtered_rules = all_rules
     
+    # Action buttons - always show, even when no rules
+    col1, col2, col3 = st.columns([1, 1, 1])
+    with col3:
+        if st.button("➕ New Rule", use_container_width = True):
+            st.session_state.editing_rule_id = None
+            st.session_state.show_rule_form = True
+            st.rerun()
+    
+    # Rule form (create or edit) - show regardless of whether rules exist
+    if st.session_state.show_rule_form:
+        st.markdown("---")
+        if st.session_state.editing_rule_id:
+            st.subheader("Edit Rule")
+            # Get full rule details for editing
+            rule_to_edit = api_client.get_rule(st.session_state.editing_rule_id)
+            if not rule_to_edit:
+                st.error(f"Rule {st.session_state.editing_rule_id} not found")
+                st.session_state.show_rule_form = False
+                st.session_state.editing_rule_id = None
+                st.rerun()
+        else:
+            st.subheader("Create New Rule")
+            rule_to_edit = None
+        
+        _render_rule_form(rule_to_edit)
+    
     if not filtered_rules:
-        st.info("No rules found matching the filters.")
+        st.info("No rules found matching the filters. Click 'New Rule' above to create your first compliance rule.")
     else:
         # Display rules in a table
         rules_data = []
@@ -416,14 +449,6 @@ try:
         
         st.dataframe(rules_data, width = 'stretch', hide_index = True)
         
-        # Action buttons
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col3:
-            if st.button("➕ New Rule", use_container_width = True):
-                st.session_state.editing_rule_id = None
-                st.session_state.show_rule_form = True
-                st.rerun()
-        
         # Rule details
         st.markdown("---")
         st.subheader("Rule Details")
@@ -440,24 +465,6 @@ try:
                 st.session_state.editing_rule_id = selected_rule_id
                 st.session_state.show_rule_form = True
                 st.rerun()
-        
-        # Rule form (create or edit)
-        if st.session_state.show_rule_form:
-            st.markdown("---")
-            if st.session_state.editing_rule_id:
-                st.subheader("Edit Rule")
-                # Get full rule details for editing
-                rule_to_edit = api_client.get_rule(st.session_state.editing_rule_id)
-                if not rule_to_edit:
-                    st.error(f"Rule {st.session_state.editing_rule_id} not found")
-                    st.session_state.show_rule_form = False
-                    st.session_state.editing_rule_id = None
-                    st.rerun()
-            else:
-                st.subheader("Create New Rule")
-                rule_to_edit = None
-            
-            _render_rule_form(rule_to_edit)
         
         # Rule details view
         if selected_rule_id and not st.session_state.show_rule_form:

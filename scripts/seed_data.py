@@ -768,13 +768,32 @@ def create_sample_rules():
     
     rules = []
     for rule_data in rules_data:
-        rule = Rule(**rule_data)
-        db.session.add(rule)
-        rules.append(rule)
+        # Check if rule already exists by name
+        existing_rule = Rule.query.filter_by(rule_name=rule_data['rule_name']).first()
+        if existing_rule:
+            logger.info(f"Rule '{rule_data['rule_name']}' already exists, skipping")
+            rules.append(existing_rule)
+        else:
+            rule = Rule(**rule_data)
+            db.session.add(rule)
+            rules.append(rule)
+            logger.info(f"Created rule: {rule_data['rule_name']}")
     
     db.session.commit()
-    logger.info(f"Created {len(rules)} compliance rules")
+    logger.info(f"Ensured {len(rules)} compliance rules exist")
     return rules
+
+
+def ensure_sample_rules_exist():
+    """Ensure sample rules exist without dropping database. Can be called safely."""
+    logger.info("Ensuring sample compliance rules exist")
+    try:
+        rules = create_sample_rules()
+        logger.info(f"Sample rules check complete: {len(rules)} rules exist")
+        return rules
+    except Exception as e:
+        logger.error(f"Error ensuring sample rules exist: {e}", exc_info=True)
+        return []
 
 
 def create_sample_rule_attachments(funds, rules):
