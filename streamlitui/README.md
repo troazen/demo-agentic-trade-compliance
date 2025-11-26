@@ -19,12 +19,22 @@ Streamlit frontend for the Investment Operations Compliance System.
    ```bash
    streamlit run streamlitui/app.py
    ```
+   
+   **Note**: The app is configured to run on port 80 (default HTTP port) via `.streamlit/config.toml`. 
+   On Windows, running on port 80 requires administrator privileges. The app will be accessible at `http://localhost` (no port number needed).
 
 ## Configuration
 
+### API Configuration
 The API base URL can be configured via:
 - Environment variable: `API_BASE_URL` (default: `http://localhost:5000`)
 - Or modify `streamlitui/config.py` directly
+
+### Server Configuration
+The Streamlit server port and settings are configured in `.streamlit/config.toml`:
+- **Port**: Set to 80 (default HTTP port) - allows access via `http://localhost` without specifying a port
+- **Address**: Set to `0.0.0.0` to accept connections from any network interface
+- **Note**: On Windows, port 80 requires administrator privileges. Run your terminal/PowerShell as Administrator if you encounter permission errors.
 
 ## Usage
 

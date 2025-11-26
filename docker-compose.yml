@@ -27,7 +27,7 @@ services:
     environment:
       - API_BASE_URL=http://backend_trade_compliance:5000
     ports:
-      - 8501:8501
+      - 80:80
     depends_on:
       - backend_trade_compliance
     # volumes:
