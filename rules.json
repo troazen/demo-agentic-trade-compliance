@@ -1,0 +1,81 @@
+{
+  "success": true,
+  "rules": [
+    {
+      "rule_id": 6,
+      "rule_name": "No Investment in Tobacco or Gambling (ESG)",
+      "alert_message": "ESG Restriction: The fund is prohibited from investing in issuers primarily engaged in Tobacco or Gambling activities.",
+      "trade_compliance_mode": true,
+      "portfolio_compliance_mode": true,
+      "logic": "issuers.gics_sub_industry IN ('Tobacco', 'Casinos & Gaming')",
+      "denominator": "prohibit",
+      "alert_if": null,
+      "alert_level": null,
+      "active": true,
+      "created_at": "2025-11-29T10:00:00.000000",
+      "updated_at": "2025-11-29T10:00:00.000000",
+      "attached_funds": []
+    },
+    {
+      "rule_id": 7,
+      "rule_name": "Min 20% Allocation to Healthcare Sector",
+      "alert_message": "This fund has a mandate to maintain significant exposure to the Healthcare sector to ensure thematic consistency.",
+      "trade_compliance_mode": true,
+      "portfolio_compliance_mode": true,
+      "logic": "issuers.gics_sector = 'Health Care'",
+      "denominator": "total_assets",
+      "alert_if": "below",
+      "alert_level": 20,
+      "active": true,
+      "created_at": "2025-11-29T10:05:00.000000",
+      "updated_at": "2025-11-29T10:05:00.000000",
+      "attached_funds": []
+    },
+    {
+      "rule_id": 8,
+      "rule_name": "Max 5% Net Assets in Emerging Markets",
+      "alert_message": "Risk Control: Limits exposure to Emerging Market volatility to 5% of Net Assets.",
+      "trade_compliance_mode": true,
+      "portfolio_compliance_mode": false,
+      "logic": "issuers.country_incorporation_code IN ('BRA', 'CHN', 'IND', 'MEX', 'ZAF', 'TUR', 'KOR')",
+      "denominator": "net_assets",
+      "alert_if": "above",
+      "alert_level": 5,
+      "active": true,
+      "created_at": "2025-11-29T10:10:00.000000",
+      "updated_at": "2025-11-29T10:10:00.000000",
+      "attached_funds": []
+    },
+    {
+      "rule_id": 9,
+      "rule_name": "Max 2% Shares Outstanding in Micro-Cap Issuers",
+      "alert_message": "Liquidity Risk: We cannot own more than 2% of the outstanding shares of any company defined as Micro-Cap (Market Cap < 300M).",
+      "trade_compliance_mode": true,
+      "portfolio_compliance_mode": true,
+      "logic": "securities.market_cap < 300000000",
+      "denominator": "shares_outstanding_fe",
+      "alert_if": "above",
+      "alert_level": 2,
+      "active": true,
+      "created_at": "2025-11-29T10:15:00.000000",
+      "updated_at": "2025-11-29T10:25:00.000000",
+      "attached_funds": []
+    },
+    {
+      "rule_id": 10,
+      "rule_name": "No High Yield (Junk) Bonds",
+      "alert_message": "Credit Quality: The fund is prohibited from holding fixed income securities with a credit rating below BBB-.",
+      "trade_compliance_mode": true,
+      "portfolio_compliance_mode": true,
+      "logic": "securities.credit_rating IN ('BB+', 'BB', 'B', 'CCC', 'D')",
+      "denominator": "prohibit",
+      "alert_if": null,
+      "alert_level": null,
+      "active": true,
+      "created_at": "2025-11-29T10:20:00.000000",
+      "updated_at": "2025-11-29T10:25:00.000000",
+      "attached_funds": []
+    }
+  ],
+  "count": 5
+}
